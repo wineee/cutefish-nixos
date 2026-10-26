@@ -3,13 +3,12 @@
 调研日期：2026-10-21。数据取自 GitHub API（组织 `cutefishos`）与
 `cutefishos/packaging` 的 `versions` / `debian/*/control`。
 
-## 当前进度（2026-10-26 更新：已拆为独立仓库）
+## 当前进度（2026-10-26 更新）
 
-- 本仓库（`cutefish-nixos`）从 `dde-cutefish-for-nixos` 中拆出，只保留 Cutefish
-  相关内容：`packages/`（包集）、`nixos-modules/`（NixOS 模块）、`vm/`（调试
-  VM）、`docs/`（本文档）。DDE 那套留在原仓库，两边互不依赖。
-- `.gitignore` 忽略 `/src`：上游源码 clone / 快照目录（原仓库叫 `/cutefish`），
-  用 `git clone git@github.com:cutefishos/<repo>` 取（https 在本环境被代理拒）。
+- 仓库只放 Cutefish：`packages/`（包集）、`nixos-modules/`（NixOS 模块）、
+  `vm/`（调试 VM）、`docs/`（本文档）。
+- `.gitignore` 忽略 `/src`：上游源码 clone / 快照目录，用
+  `git clone git@github.com:cutefishos/<repo>` 取（https 在本环境被代理拒）。
 - `packages/default.nix` 是包集入口，在 `flake.nix` 里以独立属性集接入
   （`packages.<system>.cutefish-*`，另有 `legacyPackages.cutefish`）；
   用 `lib.fix` 自举，不是 `lib.makeScope`。

@@ -12,7 +12,6 @@
 
 把 Cutefish（`github.com/cutefishos`）移植到 NixOS。上游没有 tag、日更，全部
 按 commit 钉；toolkit 用自研 UI 工具包（Skia 在 GLES 上自绘），不走 Qt/DTK。
-本仓库从 `dde-cutefish-for-nixos` 拆出，与 DDE 无关。
 
 ## 常用命令
 

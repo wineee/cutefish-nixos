@@ -2,9 +2,6 @@
 
 Cutefish desktop environment for NixOS — packages, NixOS module and a debug VM.
 
-Split out of [`wineee/dde-cutefish-for-nixos`](https://github.com/wineee/dde-cutefish-for-nixos);
-the DDE port lives there, the two repositories share nothing.
-
 > [!WARNING]
 > **Experimental — please read before using.**
 >
