@@ -1,0 +1,14 @@
+result
+result-*
+/nixos.qcow2
+vm/nixos.qcow2
+vm/result
+vm/result-*
+vm/run-*.sh
+vm/*.log
+vm/vm-tmp/
+
+# upstream sources cloned for analysis (fetch.py writes here too)
+/src
+
+.workbuddy/
