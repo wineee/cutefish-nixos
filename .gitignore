@@ -12,3 +12,6 @@ vm/vm-tmp/
 /src
 
 .workbuddy/
+
+# scratch dirs used while verifying (temp eval shims, downloads)
+.nix-tmp/
