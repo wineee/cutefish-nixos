@@ -57,7 +57,7 @@ services.cutefish.artwork.wallpapers.enable = false;             # skip the unfr
 ```
 
 Non-flake setups go through `flake-compat` with
-`https://github.com/wineee/cutefish-nixos/archive/master.tar.gz`.
+`https://github.com/wineee/cutefish-nixos/archive/main.tar.gz`.
 
 ## Building
 
