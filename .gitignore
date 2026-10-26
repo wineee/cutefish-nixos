@@ -15,3 +15,4 @@ vm/vm-tmp/
 
 # scratch dirs used while verifying (temp eval shims, downloads)
 .nix-tmp/
+vm/flake.lock
