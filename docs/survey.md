@@ -12,11 +12,13 @@
 11-13，那也是它们各自的最新）。`cutefish-skia` 跟着 toolkit 换了引脚
 （`95ee33d` → `ea1e651`，仍是 `chrome/m156`）。这次升级要处理的适配：
 
-- **framework 新增 `pdf/` 组件**：把一份 pin 死的 PDFium（`chromium/8158`，
-  `scripts/fetch-pdfium.sh`）编成 hidden object 塞进 `cutefish-pdf`。Nix 侧
-  暂时用 `-DCUTEFISH_FRAMEWORK_PDF=OFF` 关掉（补丁给它加了个 option）——
-  目前没有任何包 `find_package(CutefishPdf)`，等要打出 `preview` 时再补
-  PDFium 的 derivation（那会是一个和 Skia 同量级、但依赖更杂的活）。
+- **framework 新增 `pdf/` 组件**：上游把它 pin 死的一份 PDFium
+  （`chromium/8158`，`scripts/fetch-pdfium.sh`）编成 hidden object 塞进
+  `cutefish-pdf`。Nix 侧改成链接 nixpkgs 的 `pdfium`（8066）：补丁加了
+  `-DCUTEFISH_PDFIUM_SYSTEM`，走 `find_path`/`find_library`，源码不动
+  （`#include "public/fpdf_*.h"` 在 `${pdfium.dev}/include` 下原样成立）。
+  API 面抽查齐全，`hello.pdf` 的取页数、文本、渲染都跑通了；版本差 92 个
+  chromium 分支，`FPDF_LIBRARY_CONFIG` 仍用 version 2。
 - **framework 新增账号头像**：`/usr/share/cutefish/avatars` 改成
   `/run/current-system/sw/share/cutefish/avatars`（头像文件随 wallpapers 包
   发，不能让一个库反过来依赖它，何况它 unfree）；`artwork.nix` 的
@@ -115,7 +117,7 @@
 | cutefish-computer-use | Rust | 0 | L3 AI 电脑控制（MCP server，wayland + 截图编码） | 可选 |
 | cutefish-installer | C++ | 0 | 安装器（分区/daemon/polkit） | 否（NixOS 不需要） |
 | cutefish-webkit | C++ | 0 | 自研 WebKit（WPE 派生，2026-11 新增） | 暂不（体量） |
-| preview | C++ | 0 | 图片/PDF 查看器（2026-11 新增） | 待 PDFium |
+| preview | C++ | 0 | 图片/PDF 查看器（2026-11 新增） | 待打包（PDFium 已就绪） |
 | qt-plugins | C++ | 14 | Qt6 平台主题/图片格式/滚动（Qt6） | 可选 |
 | icons | CMake | 40 | 图标主题（GPL-3.0） | 是 |
 | wallpapers | CMake | 58 | 壁纸 + 账号头像（许可标注 NOASSERTION，需人工确认） | 是 |

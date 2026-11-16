@@ -118,6 +118,6 @@ text-input-unstable-v3 …）。自研协议在运行期绑定、不存在就退
   （`find_package(CutefishToolkit)`，另有 `calculator-engine` 静态库）。依赖
   很轻，随时可以加进 `packages/`。
 - `preview`：图片/PDF 查看器，`find_package` 里除了 toolkit 和
-  `CutefishFiles` 还要 **`CutefishPdf`** —— 也就是 framework 里那个自己编
-  PDFium 的组件（`-DCUTEFISH_FRAMEWORK_PDF`）。要打它得先把 PDFium 做成
-  独立 derivation。
+  `CutefishFiles` 还要 **`CutefishPdf`** —— framework 里的 PDF 组件已经从
+  nixpkgs 的 `pdfium` 链接出来了（见 survey.md），所以现在只差把它加进
+  `packages/`。
