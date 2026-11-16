@@ -40,8 +40,9 @@ in
       ++ lib.optional cfg.wallpapers.enable pkgs.cutefish.cutefish-wallpapers;
 
     # The icon theme is found through XDG_DATA_DIRS; the wallpapers live in
-    # share/backgrounds, which buildEnv does not link by default.
+    # share/backgrounds and the account presets in share/cutefish, neither of
+    # which buildEnv links by default.
     xdg.icons.enable = lib.mkDefault true;
-    environment.pathsToLink = [ "/share/backgrounds" "/share/wallpapers" ];
+    environment.pathsToLink = [ "/share/backgrounds" "/share/wallpapers" "/share/cutefish" ];
   };
 }

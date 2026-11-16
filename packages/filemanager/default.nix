@@ -13,19 +13,22 @@
   libarchive,
   libzip,
   samba,
+  bzip2,
+  xz,
+  lzfse,
   cutefish-toolkit,
   cutefish-framework,
 }:
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "cutefish-filemanager";
-  version = "1.0-unstable-2026-10-22";
+  version = "1.0-unstable-2026-11-15";
 
   src = fetchFromGitHub {
     owner = "cutefishos";
     repo = "filemanager";
-    rev = "a475b515692e2acbf6cdaf2b4c4c16a593095d06";
-    hash = "sha256-0+VTdzOGrUsDmfCyfQvpHzOCj8Q1JES2OH7ItbpIOFA=";
+    rev = "5cdf7601a614134975add7f1005dd29564488bee";
+    hash = "sha256-e1HIrGvCHQzse3Ll0xE1AbM94+aIbS6oY73sxT5GtkY=";
   };
 
   nativeBuildInputs = [
@@ -46,6 +49,10 @@ stdenv.mkDerivation (finalAttrs: {
     libarchive
     libzip
     samba # smbclient
+    # Disk images handled by cutefish-mountd.
+    bzip2
+    xz # liblzma
+    lzfse
   ];
 
   cmakeFlags = [ "-DBUILD_TESTING=OFF" ];

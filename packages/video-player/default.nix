@@ -12,13 +12,13 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "cutefish-video-player";
-  version = "1.0-unstable-2026-10-22";
+  version = "1.0-unstable-2026-11-15";
 
   src = fetchFromGitHub {
     owner = "cutefishos";
     repo = "video-player";
-    rev = "86f2eab74dadfd0482f457122547e0684bca3f23";
-    hash = "sha256-3mPfyqau/0JExgwKToZ6qHJgDlXLNb2BushKxgzVfO0=";
+    rev = "bfb4dca179d5f5f000c0eb1a4a1fc20c24f560d2";
+    hash = "sha256-9fkPK//d+b3MLzQ3RPBu0ECY00TO3bRyRunV4zQRU4o=";
   };
 
   nativeBuildInputs = [

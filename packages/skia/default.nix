@@ -38,15 +38,16 @@ in
 # includes them as "include/core/SkCanvas.h" relative to the source root.
 stdenv.mkDerivation (finalAttrs: {
   pname = "cutefish-skia";
-  version = "156-unstable-2026-10-19";
+  version = "156-unstable-2026-11-06";
 
   src = fetchFromGitHub {
     owner = "google";
     repo = "skia";
-    rev = "95ee33d7ec7791ab9c071675710a14fe6408ae4f";
-    # Unpacked NAR hash. Getting it costs a >500 MB download, so do not
-    # regenerate it casually: `nix build .#cutefish-skia` and read `got:`.
-    hash = "sha256-ou4cLjDBhKrL7yUJX/4el/HTDDWcmpL9ZGsdmHjX3I4=";
+    rev = "ea1e651d7a105f5ca327dfd65d28957957279e2e";
+    # Unpacked NAR hash. The tarball is 80 MB but the tree is 217 MB and
+    # codeload is slow from here, so do not regenerate it casually:
+    # `nix build .#cutefish-skia` and read `got:`.
+    hash = "sha256-V1cKIFv6YCbEjqQk9hAgeITKyQaD2xYUnEWFW6772OE=";
   };
 
   nativeBuildInputs = [

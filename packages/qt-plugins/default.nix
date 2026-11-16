@@ -13,13 +13,13 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "cutefish-qt-plugins";
-  version = "1.0-unstable-2026-10-22";
+  version = "1.0-unstable-2026-11-01";
 
   src = fetchFromGitHub {
     owner = "cutefishos";
     repo = "qt-plugins";
-    rev = "7e1a132d26aae471832179f765c7c5d28d62bc4a";
-    hash = "sha256-NymabMQZIYPYcVURo8NiROIQE1i8f3Q89X96tYGTv3w=";
+    rev = "8d79992d37764b6e487b7e7a16c83eab6f4b69ee";
+    hash = "sha256-lwbqnDmSk4VsUugBbkBqS5pJW2mSwbhsgpcdwOg4oG0=";
   };
 
   patches = [

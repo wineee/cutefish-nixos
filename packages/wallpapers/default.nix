@@ -7,13 +7,13 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "cutefish-wallpapers";
-  version = "1.0-unstable-2026-10-19";
+  version = "1.0-unstable-2026-11-13";
 
   src = fetchFromGitHub {
     owner = "cutefishos";
     repo = "wallpapers";
-    rev = "2c6191179b82c49584e738baf92d34a84c6a62d6";
-    hash = "sha256-oyq7PuGb3X+aEwBC3neVXTl4a05bgjiVaPVfb1egIXs=";
+    rev = "d0e37fb7e9a6498b0d5f31c51a7df3facbae15c9";
+    hash = "sha256-vynkQpABKXa/tiv0IogOcthfeZiL8guYpeCw28bjpFw=";
   };
 
   nativeBuildInputs = [ cmake ];
@@ -22,10 +22,13 @@ stdenv.mkDerivation (finalAttrs: {
   # (stdenv, not stdenvNoCC: the top-level project() enables C/CXX.)
   dontBuild = true;
 
-  # Upstream installs to the absolute /usr/share/backgrounds.
+  # Upstream installs to the absolute /usr/share/backgrounds; the account
+  # presets moved into share/cutefish/avatars with the same problem.
   postPatch = ''
     substituteInPlace sources/CMakeLists.txt \
       --replace-fail "/usr/share/backgrounds/cutefishos" "share/backgrounds/cutefishos"
+    substituteInPlace avatars/CMakeLists.txt \
+      --replace-fail "/usr/share/cutefish/avatars" "share/cutefish/avatars"
   '';
 
   meta = {

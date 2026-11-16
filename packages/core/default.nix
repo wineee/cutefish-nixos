@@ -25,13 +25,13 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "cutefish-core";
-  version = "1.0-unstable-2026-10-22";
+  version = "1.0-unstable-2026-11-15";
 
   src = fetchFromGitHub {
     owner = "cutefishos";
     repo = "cutefish-core";
-    rev = "4e8e6061d86d349fba093b17e27bea6146d805d2";
-    hash = "sha256-SlApZdfpkEnIr2M/UsBn9w/Foj0HONllSXUZJ1U+Nuk=";
+    rev = "aee35e3d0b8340c2d21c933bf51561a6b1cb258a";
+    hash = "sha256-RXsZt2JALLatv9mi1J8fytih69mzmcDbfIgdmu6eaPI=";
   };
 
   # Everything that assumes an FHS layout. The Debian-only bits are left
