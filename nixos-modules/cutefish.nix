@@ -35,6 +35,11 @@ in
     xdg.mime.enable = true;
     xdg.menus.enable = true;
     xdg.icons.enable = true;
+    # The viewer this desktop ships with, overridable by the user.
+    xdg.mime.defaultApplications = lib.mkDefault {
+      "image/*" = "cutefish-preview.desktop";
+      "application/pdf" = "cutefish-preview.desktop";
+    };
 
     environment.systemPackages = with pkgs.cutefish; [
       # Not just for its wayland-sessions entry: the session's own commands
@@ -42,8 +47,11 @@ in
       # have to be on PATH -- the compositor looks the latter two up at
       # runtime, and the login screen executes the first one by name.
       cutefish-core
+      cutefish-calculator
       cutefish-calendar
       cutefish-filemanager
+      # Handles images and PDFs; its desktop entry claims those types.
+      cutefish-preview
       cutefish-settings
       cutefish-system-monitor
       cutefish-terminal
