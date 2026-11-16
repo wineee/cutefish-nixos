@@ -131,3 +131,21 @@ text-input-unstable-v3 …）。自研协议在运行期绑定、不存在就退
   `application/pdf`，所以进 `systemPackages` 后就是这两类的默认打开程序。
 
 两个的 `tests/` 都要 GTest，`BUILD_TESTING=OFF` 关掉即可。
+
+## 七、cutefish-computer-use（Rust MCP server）
+
+不是 toolkit 应用，是独立的 Rust 二进制（stdio MCP server），让 agent app
+在用户同意后看屏幕、控制指针键盘。上游 `publish = false` 且没提交
+`Cargo.lock`：本地用 cargo 1.98 `generate-lockfile` 生成一份（44 crate）放进
+包目录，src derivation 里删掉上游指向 Debian `/usr/share/cargo/registry` 的
+`.cargo/config.toml`、拷进 lock，再由 `buildRustPackage` 用 `cargoHash` vendor。
+
+自研协议 `cutefish-computer-control-v1.xml` 由 `wayland-scanner` 的宏在编译期
+生成代码，运行时不读文件；`ext-image-copy-capture` 走 nixpkgs 的
+`wayland-protocols`。产物是纯静态 Rust 二进制，只链 glibc（2.1M）。
+
+compositor 启动时按 PATH 找 `cutefish-computer-use` 并做 canonical 校验，
+因此模块里加了默认关闭的
+`services.desktopManager.cutefish.computerUse.enable`，打开才把它放进
+`systemPackages`——agent 控制桌面是隐私敏感能力，默认不装。冒烟验证过 MCP
+握手（`initialize` 返回 2025-06-18）和 `tools/list`（22 个工具）。

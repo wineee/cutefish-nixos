@@ -5,6 +5,22 @@
 
 ## 当前进度（2026-11-16 更新）
 
+### 2026-11-16 打包 cutefish-computer-use：20/20 构建通过
+
+Rust 写的 MCP server（stdio），让 agent app 在用户同意后看屏幕、控制指针
+键盘。打包要点：
+
+- 仓库没提交 `Cargo.lock`（`publish = false`），本地用 cargo 1.98 生成一份
+  放进包目录，src derivation 里拷进去再让 `buildRustPackage` vendor；
+- `.cargo/config.toml` 把 crates.io 重定向到 Debian 的离线 registry
+  （`/usr/share/cargo/registry`），src derivation 里删掉；
+- 协议 XML 由 `wayland-scanner` 宏在编译期生成代码，运行时不读文件，纯
+  Rust 静态二进制（只链 glibc，2.1M）；
+- compositor 启动时按 PATH 找 `cutefish-computer-use` 做 canonical 校验，
+  所以模块加了默认关闭的 `services.desktopManager.cutefish.computerUse.enable`，
+  打开才把它放进 `systemPackages`（隐私敏感，默认不装）。
+- 冒烟：喂 MCP `initialize` + `tools/list`，握手成功、列出 22 个工具。
+
 ### 2026-11-16 新增 calculator 与 preview：19/19 构建通过
 
 两个 2026-11 才出现的应用补上了。都是 toolkit 应用，没有额外的路径适配，
@@ -60,10 +76,10 @@ desktop 文件里的 `Exec` 本来就是裸命令名：
 - `packages/default.nix` 是包集入口，在 `flake.nix` 里以独立属性集接入
   （`packages.<system>.cutefish-*`，另有 `legacyPackages.cutefish`）；
   用 `lib.fix` 自举，不是 `lib.makeScope`。
-- **已构建通过（19/19，全部取自 2026-11-15 的 upstream HEAD）**：
-  `cutefish-skia`、`cutefish-toolkit`、`cutefish-framework`、
+- **已构建通过（20/20，取自 2026-11-15 的 upstream HEAD；computer-use 是
+  11-14）**：`cutefish-skia`、`cutefish-toolkit`、`cutefish-framework`、
   `cutefish-compositor`、`cutefish-core`、`cutefish-dm`、`cutefish-icons`、
-  `cutefish-wallpapers`、`cutefish-qt-plugins`、
+  `cutefish-wallpapers`、`cutefish-qt-plugins`、`cutefish-computer-use`、
   `xdg-desktop-portal-cutefish`，以及应用 `text-editor` / `filemanager` /
   `settings` / `terminal` / `video-player` / `calendar` / `system-monitor` /
   `calculator` / `preview`。
@@ -77,8 +93,7 @@ desktop 文件里的 `Exec` 本来就是裸命令名：
 - `vm/` 已换成真会话（cutefish-dm + cutefish-wayland），镜像构建通过；
   **真机/VM 里的实际启动还没验过**（需要宿主 GPU 的 DRM/EGL，沙箱里没有）。
   不开自动登录（开了就看不到登录界面，见 5.2 节）。
-- 剩余：`cutefish-computer-use`（Rust AI 控制）未打包；`cutefish-installer`
-  不打。
+- 剩余：`cutefish-installer` 不打（NixOS 有自己的安装器）。
 
 **有意留着没改的两处 FHS 路径**（都在 `framework` / `core` 里，理由见
 `docs/core.md` 第二节）：framework 的 VPN 插件扫描目录
@@ -129,7 +144,7 @@ desktop 文件里的 `Exec` 本来就是裸命令名：
 | calendar | C++ | 0 | L3 应用 | 是 |
 | system-monitor | C++ | 0 | L3 应用 | 是 |
 | xdg-desktop-portal-cutefish | C++ | 0 | L3 门户后端 | 必须（桌面功能完整性） |
-| cutefish-computer-use | Rust | 0 | L3 AI 电脑控制（MCP server，wayland + 截图编码） | 可选 |
+| cutefish-computer-use | Rust | 0 | AI 控制（MCP server，wayland + 截图编码） | 是（模块里 opt-in） |
 | cutefish-installer | C++ | 0 | 安装器（分区/daemon/polkit） | 否（NixOS 不需要） |
 | cutefish-webkit | C++ | 0 | 自研 WebKit（WPE 派生，2026-11 新增） | 暂不（体量） |
 | preview | C++ | 0 | 图片/PDF 查看器（2026-11 新增） | 是 |
@@ -356,10 +371,13 @@ Cutefish 自己实现了 polkit agent 和一批系统服务，这一块在 NixOS
 
 ### 5. 可选件的取舍
 
-`cutefish-computer-use` 是 Rust，仓库里 **没有提交 `Cargo.lock`**（只有
-`Cargo.toml`，`publish = false`），`buildRustPackage` 需要先生成 lock 或用
-`cargoHash`；且它依赖自研 wayland 协议，必须与 compositor 同版本。建议放到
-主线跑通后再做。
+`cutefish-computer-use`（已打包）：Rust，`Cargo.toml` 里 `publish = false` 且
+没提交 `Cargo.lock`。用 cargo 1.98 本地 `generate-lockfile` 生成一份放进包
+目录（44 个 crate），src derivation 里删掉上游那份指向 Debian 离线 registry
+的 `.cargo/config.toml` 并把 lock 拷进去，再由 `buildRustPackage` 用
+`cargoHash` vendor。自研协议 XML 编译期由 `wayland-scanner` 宏生成代码，
+运行时不读文件。它让 agent 控制桌面，模块里默认关闭，开了才进
+`systemPackages`（compositor 按 PATH 做 canonical 校验）。
 
 ## 七、建议实施路线
 
@@ -370,7 +388,7 @@ Cutefish 自己实现了 polkit agent 和一批系统服务，这一块在 NixOS
 | P2 | `cutefish-framework` → `cutefish-core` → `cutefish-compositor` | 三个包通过，协议版本对齐 |
 | P3 | `cutefish-dm` + `nixos-modules/`（PAM、dbus、udev、user、wayland-sessions） | VM 能进登录界面 |
 | P4 | 应用与 artwork（filemanager/settings/terminal/…/icons/wallpapers/portal） | 桌面可用 |
-| P5（可选） | `qt-plugins`、`cutefish-computer-use` | Qt 应用观感、AI 能力 |
+| P5（可选） | `qt-plugins`、`cutefish-computer-use`（均已打包） | Qt 应用观感、AI 能力 |
 
 每个阶段结束跑 `nix build .#<pkg> --print-out-paths --no-link` 验证。
 

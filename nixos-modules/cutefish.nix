@@ -18,6 +18,11 @@ in
   options = {
     services.desktopManager.cutefish = {
       enable = lib.mkEnableOption "Cutefish desktop environment";
+
+      computerUse.enable = lib.mkEnableOption ''
+        cutefish-computer-use, an MCP server that lets agent apps see and
+        control the desktop once the user consents
+      '';
     };
   };
 
@@ -57,7 +62,10 @@ in
       cutefish-terminal
       cutefish-text-editor
       cutefish-video-player
-    ];
+    ]
+    # The compositor resolves "cutefish-computer-use" from PATH at startup and
+    # only accepts a client whose executable matches; opt-in for privacy.
+    ++ lib.optionals cfg.computerUse.enable [ pkgs.cutefish.cutefish-computer-use ];
 
     # cutefish-dm needs to know which entry to start when the user just
     # presses enter; any other display manager reads the same list.
