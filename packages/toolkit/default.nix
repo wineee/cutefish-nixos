@@ -29,13 +29,13 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "cutefish-toolkit";
-  version = "1.0-unstable-2026-10-22";
+  version = "1.0-unstable-2026-11-15";
 
   src = fetchFromGitHub {
     owner = "cutefishos";
     repo = "cutefish-toolkit";
-    rev = "9e161d0428e0381914e4dfef8572a59904f34391";
-    hash = "sha256-t6Zr2hJhMCre9T0zg2YqDx2PxSRCAg8CHmhlmfIAy38=";
+    rev = "41782083b6926416645bbfd10d426816c24a7eae";
+    hash = "sha256-Qw3wlIoodLMs3PTxheqmRMScqx8ukdQe3zsgwUR3qSo=";
   };
 
   patches = [

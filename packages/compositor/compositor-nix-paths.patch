@@ -1,15 +1,15 @@
---- a/src/core/compositor_shell.cpp	2026-10-22 12:15:58.571302966 +0800
-+++ b/src/core/compositor_shell.cpp	2026-10-22 12:15:58.903756631 +0800
-@@ -7,6 +7,8 @@
- #include <unistd.h>
- 
- #include <algorithm>
+--- a/src/core/compositor_shell.cpp
++++ b/src/core/compositor_shell.cpp
+@@ -11,6 +11,8 @@
+ #include <cctype>
+ #include <cstdarg>
+ #include <cstdio>
 +#include <filesystem>
 +#include <system_error>
  #include <utility>
  
- #include "accelerators/accelerator_configuration.h"
-@@ -24,6 +26,7 @@
+ #include <xkbcommon/xkbcommon.h>
+@@ -30,6 +32,7 @@
  #include "backend/session/libseat_session.h"
  #include "base/dbus.h"
  #include "base/event_loop.h"
@@ -17,7 +17,7 @@
  #include "compositor/surface.h"
  #include "computer_control/controller.h"
  #include "computer_control/permission_consent.h"
-@@ -766,6 +769,23 @@
+@@ -903,6 +906,23 @@
      return services;
  }
  
@@ -41,7 +41,7 @@
  bool CompositorShell::initWayland()
  {
      m_server = std::make_unique<wayland::Server>();
-@@ -773,13 +793,13 @@
+@@ -910,15 +930,15 @@
          return false;
  
      m_security = std::make_unique<wayland::ExecutableSecurityDelegate>(
@@ -53,9 +53,12 @@
 -                                      "/usr/bin/cutefish-polkit-agent"},
 +            companionExecutables({"cutefish-services", "cutefish-polkit-agent"}),
              !m_options.noDrm,
--            withExecutables({"/usr/bin/cutefish-computer-use"}, m_options.computerControlClients));
+-            withExecutables({"/usr/bin/cutefish-computer-use"}, m_options.computerControlClients),
 +            withExecutables(companionExecutables({"cutefish-computer-use"}),
-+                            m_options.computerControlClients));
-     m_windowManager.setSystemDialogPolicy([this](int64_t pid) {
-         return m_security->showsSystemDialogs(pid);
-     });
++                            m_options.computerControlClients),
+             // The compatibility runtime, whose programs place their windows.
+-            withExecutables({"/usr/bin/reef"}, m_options.windowPlacementClients));
++            withExecutables(companionExecutables({"reef"}), m_options.windowPlacementClients));
+ 
+     wayland::ProtocolGlobals::Dependencies dependencies;
+     dependencies.server = m_server.get();

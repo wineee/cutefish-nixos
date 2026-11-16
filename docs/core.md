@@ -19,13 +19,16 @@ framework + compositor 之上，是 L2 层的全部内容。
 | `cutefish-screenrecorder` | `libexec/` | 通过 compositor 的 Wayland 连接录屏（DMA-BUF + VA-API） |
 | `cutefish-privacy` | `libexec/` | 摄像头/麦克风开关，**system** D-Bus + systemd unit |
 | `cutefish-locales` | `libexec/` | 生成本地化数据，**system** D-Bus + systemd unit（Debian 专用） |
+| `cutefish-applications-folder` | `libexec/` | 2026-11 新增：桌面上的应用文件夹，**system** D-Bus + systemd unit |
 
 随包装出来的集成面：
 
 - `share/wayland-sessions/cutefish-wayland.desktop`
-- `share/dbus-1/system-services/` + `share/dbus-1/system.d/`（Privacy、Locales）
-- `share/polkit-1/actions/`（Privacy、Locales）
-- `lib/systemd/system/`（`cutefish-locales.service`、`cutefish-privacy.service`）
+- `share/dbus-1/system-services/` + `share/dbus-1/system.d/`（Privacy、Locales、
+  ApplicationsFolder）
+- `share/polkit-1/actions/`（Privacy、Locales、ApplicationsFolder）
+- `lib/systemd/system/`（`cutefish-locales.service`、`cutefish-privacy.service`、
+  `cutefish-applications-folder.service`）
 - `lib/systemd/user/xdg-document-portal.service.d/cutefish-session.conf`（把
   旧 portal 的 `TimeoutStopSec` 压到 2s）
 - `lib/udev/rules.d/60-cutefish-privacy.rules`、`60-cutefish-ddc.rules`、

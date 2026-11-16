@@ -12,13 +12,13 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "cutefish-dm";
-  version = "1.0-unstable-2026-10-22";
+  version = "1.0-unstable-2026-11-15";
 
   src = fetchFromGitHub {
     owner = "cutefishos";
     repo = "cutefish-dm";
-    rev = "73ed274f3ec27af8e4e118f428073769fc4e873a";
-    hash = "sha256-eg3oh55IqlOKhX0nneuDaYnRjrE8Zzz/UWPyly3ao/E=";
+    rev = "2d06f21aba761b6846c8e10170f5da01addbc8a6";
+    hash = "sha256-wlz37PXChZGlNoRRth6QciHydLV6VReTALOHr03xYZU=";
   };
 
   postPatch = ''

@@ -17,13 +17,13 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "xdg-desktop-portal-cutefish";
-  version = "1.0-unstable-2026-10-22";
+  version = "1.0-unstable-2026-11-04";
 
   src = fetchFromGitHub {
     owner = "cutefishos";
     repo = "xdg-desktop-portal-cutefish";
-    rev = "03d019c0bf5cb875881f852b6a74e2b1670a5949";
-    hash = "sha256-x9RvruXCTrSY7lbpLf6rrcwxLUsAM35Cd9Gjvgqf+64=";
+    rev = "19765bcce46880e36a8cfb6b7bdcc6bd09076b59";
+    hash = "sha256-y6I2vEuWIeZ5onV+LknRBheVdgKGje/ODMSyFeR/J14=";
   };
 
   nativeBuildInputs = [

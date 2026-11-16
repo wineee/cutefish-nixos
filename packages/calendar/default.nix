@@ -13,13 +13,13 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "cutefish-calendar";
-  version = "1.0-unstable-2026-10-22";
+  version = "1.0-unstable-2026-11-15";
 
   src = fetchFromGitHub {
     owner = "cutefishos";
     repo = "calendar";
-    rev = "342ffb934dc10733b5367582b0b0dd87f8fed1bb";
-    hash = "sha256-NTpjXxZvrel7QNQ5GATT9tOakqDuw+IxgL1enW9XhXI=";
+    rev = "4332987418637a78d3d302159ec74bb5de57d4e2";
+    hash = "sha256-KusBw20MuyLXywiskmadHdIEccc8Xt7ubrbCnLyWgaQ=";
   };
 
   nativeBuildInputs = [

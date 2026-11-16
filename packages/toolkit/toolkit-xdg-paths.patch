@@ -1,5 +1,3 @@
-diff --git a/src/base/paths.cpp b/src/base/paths.cpp
-index 77d4749..8381f0a 100644
 --- a/src/base/paths.cpp
 +++ b/src/base/paths.cpp
 @@ -3,6 +3,7 @@
@@ -10,7 +8,7 @@ index 77d4749..8381f0a 100644
  #include <optional>
  #include <pwd.h>
  #include <regex>
-@@ -50,14 +51,38 @@ std::string runtimeDirectory()
+@@ -50,18 +51,42 @@
      return "/run/user/" + std::to_string(getuid());
  }
  
@@ -40,8 +38,13 @@ index 77d4749..8381f0a 100644
 +
  std::vector<std::string> dataDirectories()
  {
--    return {"/usr/local/share", "/usr/share"};
-+    return searchPath("XDG_DATA_DIRS", {"/usr/local/share", "/usr/share"});
+     // Where Flatpak exports its installed applications' entries and icons,
+     // ahead of the system's as Flatpak orders them. Snap exports its entries
+     // and icons under /var/lib/snapd/desktop, after the system's directories.
+-    return {dataHome() + "/flatpak/exports/share", "/var/lib/flatpak/exports/share", "/usr/local/share", "/usr/share",
+-            "/var/lib/snapd/desktop"};
++    return searchPath("XDG_DATA_DIRS", {dataHome() + "/flatpak/exports/share", "/var/lib/flatpak/exports/share",
++                                        "/usr/local/share", "/usr/share", "/var/lib/snapd/desktop"});
  }
  
  std::vector<std::string> configDirectories()
@@ -51,73 +54,22 @@ index 77d4749..8381f0a 100644
  }
  
  std::string cutefishConfig(const std::string& name)
-@@ -123,8 +148,10 @@ std::string findExecutable(const std::string& program)
+@@ -127,8 +152,10 @@
      if (program.find('/') != std::string::npos)
          return access(program.c_str(), X_OK) == 0 ? program : std::string();
  
 -    const std::string directories[] = {home() + "/.local/bin", "/usr/local/sbin", "/usr/local/bin",
--                                       "/usr/sbin", "/usr/bin", "/sbin", "/bin"};
+-                                       "/usr/sbin", "/usr/bin", "/sbin", "/bin", "/snap/bin"};
 +    std::vector<std::string> directories = {home() + "/.local/bin"};
 +    const std::vector<std::string> path = searchPath(
-+        "PATH", {"/usr/local/sbin", "/usr/local/bin", "/usr/sbin", "/usr/bin", "/sbin", "/bin"});
++        "PATH", {"/usr/local/sbin", "/usr/local/bin", "/usr/sbin", "/usr/bin", "/sbin", "/bin", "/snap/bin"});
 +    directories.insert(directories.end(), path.begin(), path.end());
      for (const std::string& directory : directories) {
          const std::string path = directory + "/" + program;
          if (access(path.c_str(), X_OK) == 0)
-diff --git a/src/ui/icon_loader.cpp b/src/ui/icon_loader.cpp
-index 37ee9f3..2ceb637 100644
 --- a/src/ui/icon_loader.cpp
 +++ b/src/ui/icon_loader.cpp
-@@ -8,6 +8,7 @@
- #include <climits>
- #include <cmath>
- #include <cstdio>
-+#include <cstdlib>
- #include <cstring>
- #include <filesystem>
- #include <fstream>
-@@ -52,6 +53,29 @@ static std::string homeDirectory()
-     return {};
- }
- 
-+// The XDG data directories. NixOS has no /usr/share, so the search path has
-+// to come from the environment; the spec default is the fallback.
-+static std::vector<std::string> dataDirectories()
-+{
-+    const char* value = getenv("XDG_DATA_DIRS");
-+    const std::string text = value && *value ? value : "/usr/local/share:/usr/share";
-+
-+    std::vector<std::string> directories;
-+    for (size_t start = 0; start <= text.size();) {
-+        const size_t end = text.find(':', start);
-+        std::string part = text.substr(start, end == std::string::npos ? std::string::npos : end - start);
-+        if (!part.empty() && part.front() == '/') {
-+            if (part.size() > 1 && part.back() == '/')
-+                part.pop_back();
-+            directories.push_back(part);
-+        }
-+        if (end == std::string::npos)
-+            break;
-+        start = end + 1;
-+    }
-+    return directories;
-+}
-+
- // Where icon themes live, first match first.
- static std::vector<std::string> iconBases()
- {
-@@ -61,8 +85,8 @@ static std::vector<std::string> iconBases()
-         bases.push_back(home + "/.icons");
-         bases.push_back(home + "/.local/share/icons");
-     }
--    bases.push_back("/usr/local/share/icons");
--    bases.push_back("/usr/share/icons");
-+    for (const std::string& directory : dataDirectories())
-+        bases.push_back(directory + "/icons");
-     return bases;
- }
- 
-@@ -820,8 +844,8 @@ std::string IconLoader::themeIconPath(const std::string& name, int size, double
+@@ -864,8 +864,8 @@
      if (it != m_paths.end())
          return it->second;
  
@@ -126,21 +78,21 @@ index 37ee9f3..2ceb637 100644
 +    // A missing "a-b-c" falls back to "a-b", then "a"; then pixmaps in the
 +    // data directories is looked in for the name itself.
      std::string path;
+     bool foreign = false;
      for (std::string candidate = name; !candidate.empty();) {
-         path = lookup(candidate, name, size, iconScale);
-@@ -833,8 +857,13 @@ std::string IconLoader::themeIconPath(const std::string& name, int size, double
+@@ -878,9 +878,13 @@
      for (const char* extension : kExtensions) {
          if (!path.empty())
              break;
--        if (std::filesystem::exists("/usr/share/pixmaps/" + name + extension))
+-        if (std::filesystem::exists("/usr/share/pixmaps/" + name + extension)) {
 -            path = "/usr/share/pixmaps/" + name + extension;
-+        for (const std::string& directory : dataDirectories()) {
++        for (const std::string& directory : base::paths::dataDirectories()) {
 +            const std::string candidate = directory + "/pixmaps/" + name + extension;
-+            if (std::filesystem::exists(candidate)) {
-+                path = candidate;
-+                break;
-+            }
-+        }
++            if (!std::filesystem::exists(candidate))
++                continue;
++            path = candidate;
+             foreign = true;
++            break;
+         }
      }
-     m_paths.emplace(key, path);
-     return path;
+     Resolved resolved{path, {}};

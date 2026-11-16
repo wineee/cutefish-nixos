@@ -24,13 +24,13 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "cutefish-settings";
-  version = "1.0-unstable-2026-10-22";
+  version = "1.0-unstable-2026-11-15";
 
   src = fetchFromGitHub {
     owner = "cutefishos";
     repo = "settings";
-    rev = "c0f85ad191468a9dd13fb9afb37a7feebfefddae";
-    hash = "sha256-8h/UIQHvOFB8JOa5XvWPtSo2JBU2LKi/sT1PrbvLfjs=";
+    rev = "218b8a4ee60ed1eca9ff5dd204d8b692cb077ea7";
+    hash = "sha256-Ai27kfNDU6bBXYp+vS5qvRZ1vGjThHpf1w1+smFmwYk=";
   };
 
   # Two hardcoded FHS paths the pages need at runtime.

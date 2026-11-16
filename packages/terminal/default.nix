@@ -14,13 +14,13 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "cutefish-terminal";
-  version = "1.0-unstable-2026-10-22";
+  version = "1.0-unstable-2026-11-15";
 
   src = fetchFromGitHub {
     owner = "cutefishos";
     repo = "terminal";
-    rev = "bd1d32202d66899d5ba0af55f00d871cc8d9b32c";
-    hash = "sha256-4dEgfbaxOij/iv2QGyPzGrjZVbuS1Qmv20kF7OWuppI=";
+    rev = "d3a42021c2f185dba3f8c001e4250ea4a717aee2";
+    hash = "sha256-37Cu5EhKvUHHgsGp5wVyWYV45K60PT2uvFoN9/DZY8E=";
   };
 
   # The desktop file and the shell fallbacks assume an FHS layout.

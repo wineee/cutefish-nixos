@@ -10,13 +10,13 @@
 
 stdenvNoCC.mkDerivation (finalAttrs: {
   pname = "cutefish-icons";
-  version = "1.0-unstable-2026-10-19";
+  version = "1.0-unstable-2026-11-15";
 
   src = fetchFromGitHub {
     owner = "cutefishos";
     repo = "icons";
-    rev = "83a6149105b99800afd28ace06416d4a9ee28399";
-    hash = "sha256-iY6oU2yjhyRQgv+p1WjaXaOf78MWgVV6BLs0dBM8Bak=";
+    rev = "308488e092134ae2a1f346ab28ad8cec596c5cb5";
+    hash = "sha256-MywdtvWDQy47w3VInPIreP+xv8tripUNtXT4yPcdE10=";
   };
 
   nativeBuildInputs = [

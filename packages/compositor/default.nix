@@ -31,19 +31,16 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "cutefish-compositor";
-  version = "1.0-unstable-2026-10-22";
+  version = "1.0-unstable-2026-11-15";
 
   src = fetchFromGitHub {
     owner = "cutefishos";
     repo = "cutefish-compositor";
-    rev = "0c2787486fc94bcba7af1f68cc9b40832a53a559";
-    hash = "sha256-NvjlUtq6rdH9EHZc5+O6fk8ZC+DQh2par+5hc1LB7N4=";
+    rev = "1d3b480db10a1317c4591ed10684848896a441e1";
+    hash = "sha256-LbOzxguvApB5FsbtBM644E1zsPMXz/Nx+KIeoWVDz+s=";
   };
 
   patches = [
-    # Upstream bug, sent as https://github.com/cutefishos/cutefish-compositor/pull/21
-    # -- drop this patch once that is merged.
-    ./compositor-missing-cstdint.patch
     # cutefish-services / cutefish-polkit-agent (both cutefish-core, which
     # depends on the compositor) are looked up on PATH instead of being
     # compiled in.

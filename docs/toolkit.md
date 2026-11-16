@@ -55,11 +55,14 @@ python3，系统库走 `skia_use_system_*`），但换成 cutefish 的 GN 参数
 
 | 位置 | 原 | 现 |
 |---|---|---|
-| `paths.cpp dataDirectories()` | `/usr/local/share` `/usr/share` | `XDG_DATA_DIRS` |
+| `paths.cpp dataDirectories()` | `/usr/local/share` `/usr/share`（+ flatpak/snap 导出） | `XDG_DATA_DIRS`，环境没设时回退到原来那一串 |
 | `paths.cpp configDirectories()` | `/etc/xdg` | `XDG_CONFIG_DIRS` |
-| `paths.cpp findExecutable()` | `/usr/local/...` `/usr/...` `/{s,}bin` | `PATH`（`~/.local/bin` 仍优先） |
-| `icon_loader.cpp iconBases()` | `/usr/local/share/icons` `/usr/share/icons` | `XDG_DATA_DIRS` 每项 + `/icons` |
+| `paths.cpp findExecutable()` | `/usr/local/...` `/usr/...` `/{s,}bin` `/snap/bin` | `PATH`（`~/.local/bin` 仍优先） |
 | `icon_loader.cpp` pixmaps 回退 | `/usr/share/pixmaps` | `XDG_DATA_DIRS` 每项 + `/pixmaps` |
+
+`icon_loader.cpp iconBases()` 上游在 2026-11-15 那版自己改成走
+`base::paths::dataDirectories()` 了，补丁里这一 hunk 随之删掉 —— 现在只有
+pixmaps 一处还需要动。
 
 这几个函数在 NixOS 上全是死的，不只是"路径可疑"：`application_registry`
 （应用菜单）、`mime_detection` / `mime_database` / `mime_apps`（MIME 与默认
@@ -68,7 +71,7 @@ python3，系统库走 `skia_use_system_*`），但换成 cutefish 的 GN 参数
 唯一保留的是 `locale.cpp` 的 `/etc/locale.conf`、`/etc/default/locale` ——
 读不到只是拿不到 locale，属无害回退。
 
-## 四、构建结果（2026-10-21）
+## 四、构建结果（2026-10-21，2026-11-16 复核）
 
 - `cutefish-skia`：gn gen + ninja 919 个目标，约 2.5 分钟。产物 43M：
   `libskia.a`(20M) `libsvg.a`(7.4M) `libskparagraph.a` `libskresources.a`
@@ -83,20 +86,27 @@ python3，系统库走 `skia_use_system_*`），但换成 cutefish 的 GN 参数
 
 ### 源码获取（本环境的坑）
 
-google/skia 仓库 1.2G，**GitHub 的 archive tarball 在本环境下载极慢**
-（命令行 `curl` / `gh api` 直接 502 或挂起，nix 通道能下但要几十分钟）。
-`skia.googlesource.com` 完全不可达（代理 502）。
+google/skia 仓库 1.2G，`skia.googlesource.com` 完全不可达（代理 502）。
+2026-11-16 实测：`codeload.github.com` 的 tarball **能直连下**，只是慢
+（80M 的包跑了近 40 分钟，约 80 KB/s），去掉代理即可：
 
-可行的取源码方式（和上游 `fetch-skia.sh` 一样的思想）：
+```bash
+env -u https_proxy -u HTTPS_PROXY curl -sSL -o skia.tgz \
+  https://codeload.github.com/google/skia/tar.gz/ea1e651d7a105f5ca327dfd65d28957957279e2e
+# 解压（217M）后算 hash，与 fetchFromGitHub 的 hash 一致
+nix hash path --sri --type sha256 skia-ea1e651...
+```
+
+急着要源码看代码时，ssh 稀疏检出仍然更快（98M）：
 
 ```bash
 export GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=accept-new \
   -o UserKnownHostsFile=$HOME/.ssh/known_hosts -i $HOME/.ssh/id_ed25519"
 git init skia && cd skia && git remote add origin git@github.com:google/skia.git
-git fetch --filter=blob:none --depth 1 origin 95ee33d7ec7791ab9c071675710a14fe6408ae4f
+git fetch --filter=blob:none --depth 1 origin ea1e651d7a105f5ca327dfd65d28957957279e2e
 git sparse-checkout set --cone bin build_overrides experimental/ffmpeg gn \
     include modules src third_party
-git checkout --detach FETCH_HEAD   # 98M
+git checkout --detach FETCH_HEAD
 ```
 
 包定义里仍写 `fetchFromGitHub`（可移植）；本地验证阶段用

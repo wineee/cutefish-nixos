@@ -12,13 +12,13 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "cutefish-text-editor";
-  version = "1.0-unstable-2026-10-22";
+  version = "1.0-unstable-2026-11-15";
 
   src = fetchFromGitHub {
     owner = "cutefishos";
     repo = "text-editor";
-    rev = "c17fab33f00335558a4375769642fb49c2f660ab";
-    hash = "sha256-l6D6tiEtf3VAjkbC9eqJwVP0I6BzU/2Z+FyYQ+eD5nc=";
+    rev = "11e18eabb53c5de3cfb952d10b77fdb338946d0e";
+    hash = "sha256-RPs0v1FnP8Rp58CswXXNrgWAP83HT1/XSz+ktHj8vdc=";
   };
 
   nativeBuildInputs = [
