@@ -5,7 +5,7 @@
 
 > **前提**：本仓库大量依靠 AI 代理维护，改动**不保证**达到合入 nixpkgs 的
 > 标准（`meta` 正确性、许可证、审查深度、能否上游化都不做承诺），不要原样
-> 回传上游。另外**实机启动尚未验证**：19 个包与 VM 镜像能构建，但会话需要
+> 回传上游。另外**实机启动尚未验证**：20 个包与 VM 镜像能构建，但会话需要
 > 宿主 GPU 的 DRM/EGL。
 
 ## 项目定位
@@ -98,3 +98,7 @@ type：`feat`/`fix`/`refactor`/`remove`/`chore`；scope 用包名或目录。
   会命中历史构建造成假阳性，用 `--print-out-paths`。
 - **`/tmp` 不稳**（目录会消失），临时文件写到工作区，解压用 python tarfile。
 - **本环境 utime 被拒**：`tar` / `touch` / gpg 签名都会报错，属环境限制。
+- **Rust 包（computer-use）**：上游没 `Cargo.lock`，要本地生成后放进包目录。
+  `~/.nix-profile/bin/cargo` 是 rustup shim（没默认工具链会报错），用 store 里
+  的 `cargo-1.98.1/bin/cargo` + `rustc-1.98.1/bin` 加进 PATH；生成 lock 时
+  `unset http_proxy https_proxy ...` 直连 crates.io（走代理会卡住）。
