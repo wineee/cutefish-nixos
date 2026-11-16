@@ -49,6 +49,13 @@ pkgs.lib.fix (self: {
   cutefish-system-monitor = pkgs.callPackage ./system-monitor {
     inherit (self) cutefish-toolkit;
   };
+  cutefish-calculator = pkgs.callPackage ./calculator {
+    inherit (self) cutefish-toolkit;
+  };
+  # Images and PDFs: needs the framework's files and pdf libraries.
+  cutefish-preview = pkgs.callPackage ./preview {
+    inherit (self) cutefish-toolkit cutefish-framework;
+  };
   xdg-desktop-portal-cutefish = pkgs.callPackage ./portal {
     inherit (self) cutefish-toolkit;
   };
@@ -66,10 +73,8 @@ pkgs.lib.fix (self: {
     inherit (self) cutefish-toolkit cutefish-compositor;
   };
 
-  # Remaining upstream repos, in the order they have to be packaged:
-  #   cutefish-toolkit (pinned Skia build, the real blocker)
-  #   -> cutefish-framework -> cutefish-compositor / cutefish-core / cutefish-dm
-  #   -> filemanager / settings / terminal / ... -> xdg-desktop-portal-cutefish
-  #   -> cutefish-qt-plugins, cutefish-computer-use
-  # cutefish-installer is not needed on NixOS.
+  # Everything upstream ships as a desktop application is packaged above. What
+  # is left out: cutefish-installer (NixOS has its own), cutefish-webkit (a
+  # WebKit fork, too large to be worth it), cutefish-computer-use (Rust, an MCP
+  # server for AI control, optional).
 })
