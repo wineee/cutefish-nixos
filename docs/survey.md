@@ -3,7 +3,39 @@
 调研日期：2026-10-21。数据取自 GitHub API（组织 `cutefishos`）与
 `cutefishos/packaging` 的 `versions` / `debian/*/control`。
 
-## 当前进度（2026-10-26 更新）
+## 当前进度（2026-11-16 更新）
+
+### 2026-11-16 全量升级：17/17 重新构建通过
+
+17 个包全部升到各自仓库的最新提交（多数是 2026-11-15 的 HEAD；
+`xdg-desktop-portal-cutefish` 停在 11-04、`qt-plugins` 11-01、`wallpapers`
+11-13，那也是它们各自的最新）。`cutefish-skia` 跟着 toolkit 换了引脚
+（`95ee33d` → `ea1e651`，仍是 `chrome/m156`）。这次升级要处理的适配：
+
+- **framework 新增 `pdf/` 组件**：把一份 pin 死的 PDFium（`chromium/8158`，
+  `scripts/fetch-pdfium.sh`）编成 hidden object 塞进 `cutefish-pdf`。Nix 侧
+  暂时用 `-DCUTEFISH_FRAMEWORK_PDF=OFF` 关掉（补丁给它加了个 option）——
+  目前没有任何包 `find_package(CutefishPdf)`，等要打出 `preview` 时再补
+  PDFium 的 derivation（那会是一个和 Skia 同量级、但依赖更杂的活）。
+- **framework 新增账号头像**：`/usr/share/cutefish/avatars` 改成
+  `/run/current-system/sw/share/cutefish/avatars`（头像文件随 wallpapers 包
+  发，不能让一个库反过来依赖它，何况它 unfree）；`artwork.nix` 的
+  `pathsToLink` 相应加了 `/share/cutefish`。
+- **compositor 新增 `/usr/bin/reef`**（注释里叫 "compatibility runtime"，
+  组织里没有对应仓库）：四类 companion 可执行文件统一改成按 PATH 查找再
+  `canonical()` 解析，仍然只编译自己的 store 路径进二进制。
+- **core 新增 `applicationsfolder`**：system D-Bus + systemd unit + polkit
+  action 各一个，模块里 `systemd.packages` / `services.dbus.packages` 自动
+  收走，不用改。
+- **filemanager 新增 `cutefish-mountd`**（手机/网络盘/磁盘镜像走 FUSE）：
+  多出 `bzip2`、`xz`、`lzfse` 三个依赖。
+- **wallpapers 新增 `avatars/`**：安装目标同样是绝对 `/usr/share`，一并改。
+- 上游已自己修掉、因此删掉的两个补丁：framework 的 `<spa/pod/iter.h>`、
+  compositor 的 `<cstdint>`。
+- VM 的 `nixosConfigurations.vm` 仍能求值；真机/VM 会话依旧未验。
+
+**下次升级注意**：`icons` 的 hash 用 `nix hash path` 算会偏（两万多个文件、
+大量悬空符号链接），要以 `nix build` 报的 `got:` 为准。
 
 - 仓库只放 Cutefish：`packages/`（包集）、`nixos-modules/`（NixOS 模块）、
   `vm/`（调试 VM）、`docs/`（本文档）。
@@ -12,7 +44,7 @@
 - `packages/default.nix` 是包集入口，在 `flake.nix` 里以独立属性集接入
   （`packages.<system>.cutefish-*`，另有 `legacyPackages.cutefish`）；
   用 `lib.fix` 自举，不是 `lib.makeScope`。
-- **已构建通过（17/17，全部取自当天 upstream HEAD）**：
+- **已构建通过（17/17，全部取自 2026-11-15 的 upstream HEAD）**：
   `cutefish-skia`、`cutefish-toolkit`、`cutefish-framework`、
   `cutefish-compositor`、`cutefish-core`、`cutefish-dm`、`cutefish-icons`、
   `cutefish-wallpapers`、`cutefish-qt-plugins`、
@@ -46,8 +78,9 @@
 
 ## 一、结论速览
 
-- **24 个公开仓库**，其中真正需要打成 Nix 包的 **18 个**（另 1 个是纯元包
-  `cutefish-desktop`），余下 5 个是组织配置 / 打包脚本 / 官网 / 空壳仓库。
+- **26 个公开仓库**（2026-11 复核；新增 `cutefish-webkit`、`preview`，
+  `calculator` 解除归档重写），其中真正需要打成 Nix 包的 **20 个**（另 1 个是
+  纯元包 `cutefish-desktop`），余下 5 个是组织配置 / 打包脚本 / 官网 / 空壳仓库。
 - **技术栈已换代**：不再是早期 Cutefish 0.x 的 Qt5 + KF5 路线，而是自研
   toolkit（Wayland 客户端 + **Skia** 在 GLES 上绘制），C++20。Qt 只在可选的
   `qt-plugins`（Qt6 平台主题）里出现。
@@ -79,16 +112,18 @@
 | calendar | C++ | 0 | L3 应用 | 是 |
 | system-monitor | C++ | 0 | L3 应用 | 是 |
 | xdg-desktop-portal-cutefish | C++ | 0 | L3 门户后端 | 必须（桌面功能完整性） |
-| cutefish-computer-use | Rust | 0 | L3 AI 电脑控制（wayland + 截图编码） | 可选 |
+| cutefish-computer-use | Rust | 0 | L3 AI 电脑控制（MCP server，wayland + 截图编码） | 可选 |
 | cutefish-installer | C++ | 0 | 安装器（分区/daemon/polkit） | 否（NixOS 不需要） |
+| cutefish-webkit | C++ | 0 | 自研 WebKit（WPE 派生，2026-11 新增） | 暂不（体量） |
+| preview | C++ | 0 | 图片/PDF 查看器（2026-11 新增） | 待 PDFium |
 | qt-plugins | C++ | 14 | Qt6 平台主题/图片格式/滚动（Qt6） | 可选 |
 | icons | CMake | 40 | 图标主题（GPL-3.0） | 是 |
-| wallpapers | CMake | 58 | 壁纸（许可标注 NOASSERTION，需人工确认） | 是 |
-| calculator | C++ | 12 | **已 archived**，Qt5 旧代码，不在构建清单 | 否 |
+| wallpapers | CMake | 58 | 壁纸 + 账号头像（许可标注 NOASSERTION，需人工确认） | 是 |
+| calculator | C++ | 12 | 已解除归档，重写为 toolkit 应用（2026-11） | 待包（依赖很轻） |
 | cutefish-desktop | — | — | 纯元包（仅存在于 packaging 的依赖集合） | 否（用 NixOS 模块代替） |
 | packaging | Shell | 0 | Debian 打包 + CI | 否（但 `debian/control` 是依赖权威来源） |
 | .github | Shell | 0 | 组织配置 + CI | 否 |
-| website | Astro | 0 | 官网 | 否 |
+| website（现 `cutefishos.github.io`） | Astro | 0 | 官网 | 否 |
 | getting-started | — | 18 | 只有 README/LICENSE | 否 |
 | plymouth-theme | — | 3 | 2021 年后停更 | 否 |
 
@@ -260,12 +295,27 @@ skiaSrc = fetchFromGitHub {
 （`SKIA_BUILD_DIR` / `SKIA_LIB_DIR` 可传入、跳过 `ExternalProject`）。否则
 toolkit 每次改动都会触发 Skia 全量重编（几十分钟），且无法被 Nix 缓存复用。
 
-### 2. 上游无 tag，18 个包要钉 commit
+### 2. 上游无 tag，16 个仓库要钉 commit
 
-无语义化版本可跟。做法：写一个脚本按 `packaging/versions` 的顺序批量
-`git ls-remote` 取 HEAD → 更新 `rev`/`hash`（`src/fetch.py` 就是干这个的，
-但 `src/` 被 gitignore，只在本机有）。注意 compositor/toolkit/core 必须
-**同日** commit，避免协议错配。
+无语义化版本可跟。做法：写一个脚本按 `packaging/versions` 的顺序批量取 HEAD →
+更新 `rev`/`hash`（`src/fetch.py` 只是取源码看代码用，不负责改包定义）。
+注意 compositor/toolkit/core 必须**同日** commit，避免协议错配。
+
+批量升级的实际流程（2026-11-16 走过一遍，脚本在 `/home/ut004971@uos/cf-update/`，
+不进仓库）：
+
+```bash
+# 1) HEAD + 提交时刻（version 用提交时刻的本地日期，UTC+8）
+gh api repos/cutefishos/<repo>/commits/main --jq '.sha, .commit.committer.date'
+# 2) tarball 直连下载（必须去掉代理）
+env -u https_proxy -u HTTPS_PROXY curl -sSL -o x.tgz \
+  https://codeload.github.com/cutefishos/<repo>/tar.gz/<rev>
+# 3) python tarfile 解压后算 hash（icons 例外，见下）
+nix hash path --sri --type sha256 <内层目录>
+```
+
+`curl` 的 `content-length` 是 chunked、看不到进度；skia 的 tarball 只有 80M
+（解压 217M），比文档早期估计的 ">500 MB" 小得多。
 
 ### 3. 硬编码 FHS 路径
 

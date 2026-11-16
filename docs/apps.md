@@ -78,7 +78,7 @@ text-input-unstable-v3 …）。自研协议在运行期绑定、不存在就退
 `cutefish-text-editor`），VM 构建通过，`sw/bin` 与 `sw/share/applications`
 里都到位。
 
-## 五、其余应用（2026-10-22 全部构建通过）
+## 五、其余应用（2026-10-22 全部构建通过，2026-11-16 升级后复核通过）
 
 依赖都来自仓库自己的 `find_package` / `pkg_check_modules`，缺哪一个 CMake 会
 直接报错，所以按 CMakeLists 逐一对照填 `buildInputs` 即可：
@@ -86,7 +86,7 @@ text-input-unstable-v3 …）。自研协议在运行期绑定、不存在就退
 | 包 | 额外依赖 | 需要改的路径 |
 |---|---|---|
 | cutefish-calendar | `libical`、`icu`、`curl` | 无（唯一的第二个目标 `cutefish-calendar-reminders` 也在 `bin/`） |
-| cutefish-filemanager | `CutefishFiles`（framework）、`fuse3`、`libssh`、`libmtp`、`libarchive`、`libzip`、`samba`、`systemd` | 无 |
+| cutefish-filemanager | `CutefishFiles`（framework）、`fuse3`、`libssh`、`libmtp`、`libarchive`、`libzip`、`samba`、`systemd`，以及 2026-11 新增 `cutefish-mountd` 带来的 `bzip2`、`xz`、`lzfse` | 无 |
 | cutefish-settings | framework 的多个组件、`fontconfig`、`expat`、`icu`、`libxkbcommon`、`libxcrypt`、`systemd`、`xorg.libXcursor`、`xkeyboard-config`、`tzdata`、`shadow` | 见下 |
 | cutefish-system-monitor | `icu`、`hwdata` | `gpureader.cpp` 的 pci.ids |
 | cutefish-terminal | `icu`、`pcre2`（`qmltermwidget` 要 16 位那个）、`libxkbcommon`、`runtimeShell` | 见下 |
@@ -111,3 +111,13 @@ text-input-unstable-v3 …）。自研协议在运行期绑定、不存在就退
 `toolkit-xdg-paths.patch`），`.desktop` 的 `Exec=/usr/bin/` 改成裸命令名。
 
 另外所有仓库顶层都有 `include(CTest)`，所以 `BUILD_TESTING` 必关（见第二节）。
+
+## 六、还没打的两个新应用（2026-11）
+
+- `calculator`：原来那个 Qt5 的仓库 2026-11 解除了归档，重写成 toolkit 应用
+  （`find_package(CutefishToolkit)`，另有 `calculator-engine` 静态库）。依赖
+  很轻，随时可以加进 `packages/`。
+- `preview`：图片/PDF 查看器，`find_package` 里除了 toolkit 和
+  `CutefishFiles` 还要 **`CutefishPdf`** —— 也就是 framework 里那个自己编
+  PDFium 的组件（`-DCUTEFISH_FRAMEWORK_PDF`）。要打它得先把 PDFium 做成
+  独立 derivation。
