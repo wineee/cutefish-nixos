@@ -5,6 +5,8 @@
   cmake,
   pkg-config,
   gettext,
+  fontconfig,
+  pdfium,
   icu,
   libpng,
   pipewire,
@@ -22,9 +24,10 @@ stdenv.mkDerivation (finalAttrs: {
     hash = "sha256-CzuHzYi2tYqysYEU+txxWP2mBRASuaR3kYZ7+I85vGQ=";
   };
 
-  # The PDF library wants a PDFium checkout it compiles itself
-  # (scripts/fetch-pdfium.sh); nothing packaged here links Cutefish::Pdf yet.
-  patches = [ ./framework-optional-pdf.patch ];
+  # Upstream's PDF library compiles a pinned PDFium checkout it fetches itself
+  # (scripts/fetch-pdfium.sh); link nixpkgs' instead. Packaging adaptation, so
+  # not sent upstream.
+  patches = [ ./framework-system-pdfium.patch ];
 
   # The account presets ship in cutefish-wallpapers, which must not become a
   # dependency of a library (and is unfree), so look them up in the profile.
@@ -43,6 +46,8 @@ stdenv.mkDerivation (finalAttrs: {
 
   buildInputs = [
     cutefish-toolkit
+    fontconfig # pdf: mapping the system's fonts
+    pdfium # pdf: linked, not compiled
     icu # files: icu-uc
     libpng # files: thumbnails
     pipewire # audio client: libpipewire-0.3 >= 0.3.65, libspa-0.2
@@ -53,7 +58,9 @@ stdenv.mkDerivation (finalAttrs: {
   # the build sandbox.
   cmakeFlags = [
     "-DBUILD_TESTING=OFF"
-    "-DCUTEFISH_FRAMEWORK_PDF=OFF"
+    "-DCUTEFISH_PDFIUM_SYSTEM=ON"
+    "-DPDFIUM_INCLUDE_DIR=${lib.getDev pdfium}/include"
+    "-DPDFIUM_LIBRARY=${lib.getLib pdfium}/lib/libpdfium.so"
   ];
 
   meta = {

@@ -1,0 +1,54 @@
+--- a/pdf/CMakeLists.txt
++++ b/pdf/CMakeLists.txt
+@@ -9,8 +9,23 @@
+ find_package(CutefishToolkit REQUIRED)
+ find_package(PkgConfig REQUIRED)
+ 
++# Link a distribution's PDFium instead of compiling the pinned sources.
++option(CUTEFISH_PDFIUM_SYSTEM "Link PDFium from the system instead of the pinned sources" OFF)
++
+ set(PDFIUM_SOURCE_DIR ${PROJECT_SOURCE_DIR}/third_party/pdfium)
+ set(PDFIUM_DEPS_DIR ${PROJECT_SOURCE_DIR}/third_party/pdfium-deps)
++if(CUTEFISH_PDFIUM_SYSTEM)
++    find_path(PDFIUM_INCLUDE_DIR NAMES public/fpdfview.h)
++    find_library(PDFIUM_LIBRARY NAMES pdfium)
++    if(NOT PDFIUM_INCLUDE_DIR OR NOT PDFIUM_LIBRARY)
++        message(FATAL_ERROR "PDFium is missing; set PDFIUM_INCLUDE_DIR and PDFIUM_LIBRARY")
++    endif()
++    # system_fonts.cpp maps missing fonts through fontconfig itself.
++    pkg_check_modules(PdfiumFonts REQUIRED IMPORTED_TARGET fontconfig)
++    set(PDFIUM_INCLUDE_DIRS ${PDFIUM_INCLUDE_DIR})
++    set(PDFIUM_LIBRARIES ${PDFIUM_LIBRARY} PkgConfig::PdfiumFonts)
++    set(PDFIUM_OBJECTS)
++else()
+ if(NOT EXISTS ${PDFIUM_SOURCE_DIR}/public/fpdfview.h OR NOT EXISTS ${PDFIUM_DEPS_DIR}/build/build_config.h)
+     message(FATAL_ERROR "PDFium is missing; run scripts/fetch-pdfium.sh")
+ endif()
+@@ -64,6 +79,11 @@
+ target_compile_options(pdfium-objects PRIVATE -w)
+ target_link_libraries(pdfium-objects PRIVATE PkgConfig::PdfiumSystem)
+ 
++set(PDFIUM_INCLUDE_DIRS ${PDFIUM_SOURCE_DIR})
++set(PDFIUM_LIBRARIES PkgConfig::PdfiumSystem)
++set(PDFIUM_OBJECTS $<TARGET_OBJECTS:pdfium-objects>)
++endif()
++
+ cutefish_framework_add_library(cutefish-pdf
+     TARGET Pdf
+     MODULE pdf
+@@ -72,12 +92,12 @@
+         document.cpp
+         system_fonts.cpp
+         system_fonts_p.h
+-        $<TARGET_OBJECTS:pdfium-objects>
++        ${PDFIUM_OBJECTS}
+     HEADERS document.h
+     PUBLIC_LIBRARIES Cutefish::ToolkitBase
+-    PRIVATE_LIBRARIES PkgConfig::PdfiumSystem
++    PRIVATE_LIBRARIES ${PDFIUM_LIBRARIES}
+ )
+-target_include_directories(cutefish-pdf PRIVATE ${PDFIUM_SOURCE_DIR})
++target_include_directories(cutefish-pdf PRIVATE ${PDFIUM_INCLUDE_DIRS})
+ # Only the library's own symbols: PDFium's, its inline functions' and the
+ # system libraries' stay inside.
+ target_link_options(cutefish-pdf PRIVATE -Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/cutefish-pdf.map)
