@@ -5,6 +5,20 @@
 
 ## 当前进度（2026-11-16 更新）
 
+### 2026-11-16 新增 calculator 与 preview：19/19 构建通过
+
+两个 2026-11 才出现的应用补上了。都是 toolkit 应用，没有额外的路径适配，
+desktop 文件里的 `Exec` 本来就是裸命令名：
+
+- `calculator`：重写版（旧的 Qt5 仓库已解除归档但在 `packages/` 里是另一份
+  代码），只要 `cutefish-toolkit`；图标由 `cmake/EmbedIcons.cmake` 编进二进制。
+- `preview`：图片/PDF 查看器，`find_package` 要 `CutefishToolkit` +
+  `CutefishFiles` + `CutefishPdf`，后面两个都在 framework 里 —— 上一节把
+  PDFium 改链 nixpkgs 之后这条路才通。另需 `libpng`（`pkg_check_modules`）。
+- 两个都 `include(CTest)` 且 tests 要 GTest，`BUILD_TESTING=OFF`。
+- 都加进了 `nixos-modules/cutefish.nix` 的 `systemPackages`；`preview` 的
+  desktop 声明了 image/* 与 application/pdf，装上即是这两类的默认打开程序。
+
 ### 2026-11-16 全量升级：17/17 重新构建通过
 
 17 个包全部升到各自仓库的最新提交（多数是 2026-11-15 的 HEAD；
@@ -46,12 +60,13 @@
 - `packages/default.nix` 是包集入口，在 `flake.nix` 里以独立属性集接入
   （`packages.<system>.cutefish-*`，另有 `legacyPackages.cutefish`）；
   用 `lib.fix` 自举，不是 `lib.makeScope`。
-- **已构建通过（17/17，全部取自 2026-11-15 的 upstream HEAD）**：
+- **已构建通过（19/19，全部取自 2026-11-15 的 upstream HEAD）**：
   `cutefish-skia`、`cutefish-toolkit`、`cutefish-framework`、
   `cutefish-compositor`、`cutefish-core`、`cutefish-dm`、`cutefish-icons`、
   `cutefish-wallpapers`、`cutefish-qt-plugins`、
   `xdg-desktop-portal-cutefish`，以及应用 `text-editor` / `filemanager` /
-  `settings` / `terminal` / `video-player` / `calendar` / `system-monitor`。
+  `settings` / `terminal` / `video-player` / `calendar` / `system-monitor` /
+  `calculator` / `preview`。
 - NixOS 模块：`nixosModules.cutefish`（`default` 同义）→ `nixos-modules/`
   （`cutefish.nix` 桌面入口 + `dm.nix` 显示管理器 + `artwork.nix` 图标/壁纸），
   见第 5.1 节。已接上 wayland-sessions（`cutefish-core`）、D-Bus 系统服务、
@@ -117,11 +132,11 @@
 | cutefish-computer-use | Rust | 0 | L3 AI 电脑控制（MCP server，wayland + 截图编码） | 可选 |
 | cutefish-installer | C++ | 0 | 安装器（分区/daemon/polkit） | 否（NixOS 不需要） |
 | cutefish-webkit | C++ | 0 | 自研 WebKit（WPE 派生，2026-11 新增） | 暂不（体量） |
-| preview | C++ | 0 | 图片/PDF 查看器（2026-11 新增） | 待打包（PDFium 已就绪） |
+| preview | C++ | 0 | 图片/PDF 查看器（2026-11 新增） | 是 |
 | qt-plugins | C++ | 14 | Qt6 平台主题/图片格式/滚动（Qt6） | 可选 |
 | icons | CMake | 40 | 图标主题（GPL-3.0） | 是 |
 | wallpapers | CMake | 58 | 壁纸 + 账号头像（许可标注 NOASSERTION，需人工确认） | 是 |
-| calculator | C++ | 12 | 已解除归档，重写为 toolkit 应用（2026-11） | 待包（依赖很轻） |
+| calculator | C++ | 12 | 已解除归档，重写为 toolkit 应用（2026-11） | 是 |
 | cutefish-desktop | — | — | 纯元包（仅存在于 packaging 的依赖集合） | 否（用 NixOS 模块代替） |
 | packaging | Shell | 0 | Debian 打包 + CI | 否（但 `debian/control` 是依赖权威来源） |
 | .github | Shell | 0 | 组织配置 + CI | 否 |

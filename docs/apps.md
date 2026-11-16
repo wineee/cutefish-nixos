@@ -85,12 +85,14 @@ text-input-unstable-v3 …）。自研协议在运行期绑定、不存在就退
 
 | 包 | 额外依赖 | 需要改的路径 |
 |---|---|---|
+| cutefish-calculator | 无（只 `find_package(CutefishToolkit)`） | 无 |
 | cutefish-calendar | `libical`、`icu`、`curl` | 无（唯一的第二个目标 `cutefish-calendar-reminders` 也在 `bin/`） |
 | cutefish-filemanager | `CutefishFiles`（framework）、`fuse3`、`libssh`、`libmtp`、`libarchive`、`libzip`、`samba`、`systemd`，以及 2026-11 新增 `cutefish-mountd` 带来的 `bzip2`、`xz`、`lzfse` | 无 |
 | cutefish-settings | framework 的多个组件、`fontconfig`、`expat`、`icu`、`libxkbcommon`、`libxcrypt`、`systemd`、`xorg.libXcursor`、`xkeyboard-config`、`tzdata`、`shadow` | 见下 |
 | cutefish-system-monitor | `icu`、`hwdata` | `gpureader.cpp` 的 pci.ids |
 | cutefish-terminal | `icu`、`pcre2`（`qmltermwidget` 要 16 位那个）、`libxkbcommon`、`runtimeShell` | 见下 |
 | cutefish-video-player | `icu`、`mpv` | 无 |
+| cutefish-preview | framework 的 `CutefishFiles` 与 `CutefishPdf`、`libpng` | 无 |
 | xdg-desktop-portal-cutefish | `systemd`、`pipewire`、`wayland*`、`libdrm`、`libgbm` | 无（纯粹非 FHS） |
 | cutefish-qt-plugins | `qt6Packages.qtbase`、`qttools`、`librsvg`、`wayland*` | 无；插件包，必须 `dontWrapQtApps = true` |
 
@@ -112,12 +114,20 @@ text-input-unstable-v3 …）。自研协议在运行期绑定、不存在就退
 
 另外所有仓库顶层都有 `include(CTest)`，所以 `BUILD_TESTING` 必关（见第二节）。
 
-## 六、还没打的两个新应用（2026-11）
+## 六、2026-11 新增的两个应用
 
-- `calculator`：原来那个 Qt5 的仓库 2026-11 解除了归档，重写成 toolkit 应用
-  （`find_package(CutefishToolkit)`，另有 `calculator-engine` 静态库）。依赖
-  很轻，随时可以加进 `packages/`。
-- `preview`：图片/PDF 查看器，`find_package` 里除了 toolkit 和
-  `CutefishFiles` 还要 **`CutefishPdf`** —— framework 里的 PDF 组件已经从
-  nixpkgs 的 `pdfium` 链接出来了（见 survey.md），所以现在只差把它加进
-  `packages/`。
+两个都是 2026-11 才出现的 toolkit 应用，`packages/` 里各一个目录，没做任何
+源码改动 —— 它们的 desktop 文件 `Exec` 本来就是裸命令名，`src/` 里也没有
+`/usr` 硬编码。
+
+- `calculator`：旧的那个 Qt5 仓库已解除归档，但代码整体重写过，所以打的是
+  这个新的。只要 `cutefish-toolkit`，另有 `calculator-engine` /
+  `calculator-ui` 两个静态库；图标由 `cmake/EmbedIcons.cmake` 编成
+  `icons.cpp` 塞进二进制，产物只有 `bin/` 和 `.desktop`。
+- `preview`：图片 + PDF 查看器，`find_package` 要 `CutefishToolkit` 和
+  framework 的 `CutefishFiles`、`CutefishPdf`，另外 `pkg_check_modules`
+  要 `libpng`。它把渲染丢给 `pdfworker` 线程，用的是 `Cutefish::Pdf` 的
+  渐进渲染接口。desktop 的 `MimeType` 声明了 image/*（含 avif/jxl）与
+  `application/pdf`，所以进 `systemPackages` 后就是这两类的默认打开程序。
+
+两个的 `tests/` 都要 GTest，`BUILD_TESTING=OFF` 关掉即可。
