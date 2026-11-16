@@ -73,8 +73,10 @@ pkgs.lib.fix (self: {
     inherit (self) cutefish-toolkit cutefish-compositor;
   };
 
-  # Everything upstream ships as a desktop application is packaged above. What
-  # is left out: cutefish-installer (NixOS has its own), cutefish-webkit (a
-  # WebKit fork, too large to be worth it), cutefish-computer-use (Rust, an MCP
-  # server for AI control, optional).
+  # MCP server for AI control; the compositor lets it drive the desktop only
+  # after an explicit user consent. Independent of the C++/Wayland packages.
+  cutefish-computer-use = pkgs.callPackage ./computer-use { };
+
+  # Left out: cutefish-installer (NixOS has its own) and cutefish-webkit (a
+  # WebKit fork, too large to be worth it).
 })
