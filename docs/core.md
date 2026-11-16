@@ -36,7 +36,7 @@ framework + compositor 之上，是 L2 层的全部内容。
 
 ## 二、必须改的 FHS 路径
 
-逐条改、不批量 sed（见 `AGENTS.md` 四步法）：
+逐条改、不批量 sed（见 [`AGENTS.md`](../AGENTS.md) 的路径修复约定）：
 
 | 位置 | 原文 | 改成 |
 |---|---|---|
@@ -62,13 +62,13 @@ framework + compositor 之上，是 L2 层的全部内容。
 `chromiumswitches.cpp` 判 `/usr/lib` 找发行版 wrapper 脚本的分支在 NixOS 上
 恒假 —— 结果是直接用 `PATH` 上的可执行文件名，正是想要的。
 
-## 二之二、compositor 的会话伴侣（一处循环依赖）
+## 三、compositor 的会话伴侣（一处循环依赖）
 
 合成器自己也要改几处 FHS：
 
 | 位置 | 处理 |
 |---|---|
-| `src/core/compositor_shell.cpp` 的 `/usr/bin/cutefish-services`、`/usr/bin/cutefish-polkit-agent` | 运行期在 `PATH` 里查再 `canonical()`（`compositor-nix-paths.patch`）：core 反过来依赖 compositor，把它的 store 路径编译进来会成环 |
+| `src/core/compositor_shell.cpp` 的 `/usr/bin/cutefish-services`、`/usr/bin/cutefish-polkit-agent`，以及 2026-11 新增的 `/usr/bin/reef`（组织里没有对应仓库）和 `/usr/bin/cutefish-computer-use` | 四类 companion 统一运行期在 `PATH` 里查再 `canonical()`（`compositor-nix-paths.patch`）：core 反过来依赖 compositor，把它的 store 路径编译进来会成环；computer-use 是 opt-in，找不到就不启用 |
 | `src/xwayland/xwayland_server.h` 的 `/usr/bin/Xwayland` | `${xwayland}/bin/Xwayland` |
 | `src/auth/login_sessions.cpp` 的两个 wayland-sessions 目录 | `/run/current-system/sw/share/wayland-sessions` |
 | `src/shell/wallpaper/wallpaper.cpp`、`src/session/secure_container.cpp` 的默认壁纸 | `/run/current-system/sw/share/backgrounds/cutefishos/default.jpg`（壁纸包是 unfree，合成器不该依赖它） |
@@ -78,7 +78,7 @@ framework + compositor 之上，是 L2 层的全部内容。
 比，所以从 `PATH` 查到的 profile 路径还得再 `canonical()` 一次才匹配得上 ——
 这是这个补丁里唯一不能简化的地方。
 
-## 三、dm 装了什么、改了什么
+## 四、dm 装了什么、改了什么
 
 - `bin/cutefish-dm`（主守护进程）、`libexec/cutefish-dm-helper`（PAM 会话，
   无事件循环无线程）、`libexec/cutefish-dm-session`（走 login shell 的 wrapper）。
@@ -92,7 +92,7 @@ framework + compositor 之上，是 L2 层的全部内容。
 - `data/*.pam` 装到 `$out/etc/pam.d`：Debian 的 `@include common-*` 在 NixOS 上
   不存在，模块必须自己写 PAM（见下）。
 
-## 四、NixOS 模块侧：`services.desktopManager.cutefish.enable`
+## 五、NixOS 模块侧：`services.desktopManager.cutefish.enable`
 
 `nixos-modules/cutefish.nix`（会话与桌面）接上：
 
@@ -107,11 +107,14 @@ framework + compositor 之上，是 L2 层的全部内容。
   指定，否则就是一条 eval 警告）。
 - `services.pipewire`（含 alsa/pulse）：合成器的音频客户端和录屏都要它。
 - `security.polkit.enable = true` + artwork（图标主题/壁纸）
+- `services.desktopManager.cutefish.computerUse.enable`（默认关）：打开才把
+  `cutefish-computer-use` 放进 `systemPackages`；compositor 启动按 PATH 找它
+  并做 canonical 校验。隐私敏感，见 [apps.md](apps.md) 第五节。
 
 `systemd.packages` 只**链接** unit，不会自动 enable，所以 locales/privacy 不会
 随会话起来；两者分别由 D-Bus system bus 激活和 udev tag 触发。
 
-## 五、NixOS 模块侧：`cutefish-dm`（`nixos-modules/dm.nix`）
+## 六、NixOS 模块侧：`cutefish-dm`（`nixos-modules/dm.nix`）
 
 选项在 `services.desktopManager.cutefish.displayManager.*`，桌面模块默认打开，
 想用别的 DM 启动 cutefish-wayland 就把它关掉。要点：

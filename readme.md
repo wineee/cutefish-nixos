@@ -9,7 +9,7 @@ Cutefish desktop environment for NixOS — packages, NixOS module and a debug VM
 >   produced by coding agents.** They are **not guaranteed** to meet the
 >   standards nixpkgs requires for merge, and are not meant to be upstreamed
 >   as-is.
-> - **Real-hardware boot is unverified.** All 17 packages and the VM image
+> - **Real-hardware boot is unverified.** All 20 packages and the VM image
 >   build, but starting the session needs a working DRM/EGL device, which the
 >   build sandbox does not have. Treat this as a porting workbench.
 
@@ -51,7 +51,14 @@ one go. Fine-grained switches:
 services.desktopManager.cutefish.displayManager.enable = false;  # no cutefish-dm
 services.cutefish.artwork.enable = true;                         # icons/wallpapers only
 services.cutefish.artwork.wallpapers.enable = false;             # skip the unfree ones
+
+# Privacy-sensitive: the MCP server that lets agent apps see and control the
+# desktop is packaged but NOT installed unless you opt in.
+services.desktopManager.cutefish.computerUse.enable = true;
 ```
+
+`cutefish-preview` is the default handler for `image/*` and `application/pdf`;
+the association is a `mkDefault`, so user settings win.
 
 Non-flake setups go through `flake-compat` with
 `https://github.com/wineee/cutefish-nixos/archive/main.tar.gz`.
@@ -66,10 +73,12 @@ cd vm && nix run                         # debug VM (needs host GPU)
 
 ## Documentation
 
-- [docs/survey.md](docs/survey.md) — upstream survey, progress, remaining work
-- [docs/toolkit.md](docs/toolkit.md) — Skia build and `cutefish-toolkit`
+- [docs/survey.md](docs/survey.md) — upstream overview, current status, design
+  decisions and remaining work
+- [docs/toolkit.md](docs/toolkit.md) — pinned Skia build and `cutefish-toolkit`
 - [docs/core.md](docs/core.md) — session, background services, display manager
-- [docs/apps.md](docs/apps.md) — applications, portal, artwork, Qt plugins
+- [docs/apps.md](docs/apps.md) — applications, portal, artwork, Qt plugins and
+  the `computer-use` MCP server
 
 ## Layout
 
@@ -85,15 +94,16 @@ docs/
 
 ## Status
 
-17 packages build: `cutefish-skia`, `cutefish-toolkit`, `cutefish-framework`,
+20 packages build: `cutefish-skia`, `cutefish-toolkit`, `cutefish-framework`,
 `cutefish-compositor`, `cutefish-core`, `cutefish-dm`, `cutefish-icons`,
-`cutefish-wallpapers`, `cutefish-qt-plugins`, `xdg-desktop-portal-cutefish`,
-`cutefish-terminal`, `cutefish-text-editor`, `cutefish-filemanager`,
-`cutefish-settings`, `cutefish-calendar`, `cutefish-video-player`,
-`cutefish-system-monitor`.
+`cutefish-wallpapers`, `cutefish-qt-plugins`, `cutefish-computer-use`,
+`xdg-desktop-portal-cutefish`, `cutefish-terminal`, `cutefish-text-editor`,
+`cutefish-filemanager`, `cutefish-settings`, `cutefish-calendar`,
+`cutefish-video-player`, `cutefish-system-monitor`, `cutefish-calculator`,
+`cutefish-preview`.
 
-Not packaged: `cutefish-computer-use` (Rust, no `Cargo.lock` upstream);
-`cutefish-installer` is not needed on NixOS.
+Not packaged: `cutefish-installer` (not needed on NixOS) and `cutefish-webkit`
+(a WebKit fork, too large to be worth it).
 
 Upstream publishes no tags and moves daily, so every package pins a commit;
 `toolkit`/`framework`/`compositor`/`core` speak private Wayland protocols and

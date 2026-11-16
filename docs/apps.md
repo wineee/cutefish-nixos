@@ -2,7 +2,8 @@
 
 以 `cutefish-text-editor` 为例。这一层的仓库（filemanager / settings /
 terminal / text-editor / video-player / calendar / system-monitor /
-xdg-desktop-portal-cutefish）结构高度一致，可以照抄。
+calculator / preview / xdg-desktop-portal-cutefish）结构高度一致，可以照抄。
+`cutefish-computer-use` 是独立的 Rust 二进制，放在最后一节单独说。
 
 ## 一、共同套路
 
@@ -61,24 +62,14 @@ nix build .#<pkg> --print-out-paths --no-link | xargs -I{} find {} -name '*.mo'
 - 产物只有 `bin/cutefish-text-editor` 和 `share/applications/*.desktop`。
   目前 `po/` 里只有 `.pot`，没有 `.po`，所以这一版没有任何翻译产物。
 - `.desktop` 的 `MimeType` 很长（30 多种），`Categories=Utility;TextEditor;`。
-  默认程序关联走标准的 `xdg-mime default`，等应用层打齐、桌面能选默认
-  程序时才有意义。
+  默认程序关联走标准机制；桌面模块里 `cutefish-preview` 已设为 image/* 与
+  application/pdf 的 `mkDefault` 处理器（用户设置优先）。
+- toolkit 生成的 wayland 绑定里有三个自研协议（`cutefish-shell-v1`、
+  `cutefish-window-hints-v1`、`cutefish-surface-blur-v1`），运行期绑定、
+  不存在就退化，所以这个应用也能在别的合成器下单独跑；不过 VM 现在起的
+  是 cutefish 真会话（见 [survey.md](survey.md) 第六节）。
 
-## 四、应用能否在 sway 下跑（VM 验证思路）
-
-toolkit 在 `src/CMakeLists.txt` 里为一堆 wayland 协议生成绑定代码，其中带
-`cutefish-` 前缀的三个（`cutefish-shell-v1`、`cutefish-window-hints-v1`、
-`cutefish-surface-blur-v1`）是自研的，其余都是标准/ staging 协议
-（xdg-shell、viewporter、fractional-scale-v1、cursor-shape-v1、
-text-input-unstable-v3 …）。自研协议在运行期绑定、不存在就退化，因此
-**text-editor 是可以在 sway 会话里启动的** —— 这也让它成为 toolkit 的
-第一个端到端验证手段，比等 compositor 早得多。
-
-`vm/flake.nix` 的 systemPackages 里已经加了它（`Mod+d` 里搜
-`cutefish-text-editor`），VM 构建通过，`sw/bin` 与 `sw/share/applications`
-里都到位。
-
-## 五、其余应用（2026-10-22 全部构建通过，2026-11-16 升级后复核通过）
+## 四、其余应用（2026-10-22 全部构建通过，2026-11-16 升级后复核通过）
 
 依赖都来自仓库自己的 `find_package` / `pkg_check_modules`，缺哪一个 CMake 会
 直接报错，所以按 CMakeLists 逐一对照填 `buildInputs` 即可：
@@ -114,25 +105,21 @@ text-input-unstable-v3 …）。自研协议在运行期绑定、不存在就退
 
 另外所有仓库顶层都有 `include(CTest)`，所以 `BUILD_TESTING` 必关（见第二节）。
 
-## 六、2026-11 新增的两个应用
+### 2026-11 新增的两个应用
 
-两个都是 2026-11 才出现的 toolkit 应用，`packages/` 里各一个目录，没做任何
-源码改动 —— 它们的 desktop 文件 `Exec` 本来就是裸命令名，`src/` 里也没有
-`/usr` 硬编码。
+两个都是 2026-11 才出现的 toolkit 应用，desktop 文件 `Exec` 本来就是裸命令名，
+`src/` 里也没有 `/usr` 硬编码，所以没做源码改动：
 
-- `calculator`：旧的那个 Qt5 仓库已解除归档，但代码整体重写过，所以打的是
-  这个新的。只要 `cutefish-toolkit`，另有 `calculator-engine` /
-  `calculator-ui` 两个静态库；图标由 `cmake/EmbedIcons.cmake` 编成
-  `icons.cpp` 塞进二进制，产物只有 `bin/` 和 `.desktop`。
-- `preview`：图片 + PDF 查看器，`find_package` 要 `CutefishToolkit` 和
-  framework 的 `CutefishFiles`、`CutefishPdf`，另外 `pkg_check_modules`
-  要 `libpng`。它把渲染丢给 `pdfworker` 线程，用的是 `Cutefish::Pdf` 的
-  渐进渲染接口。desktop 的 `MimeType` 声明了 image/*（含 avif/jxl）与
-  `application/pdf`，所以进 `systemPackages` 后就是这两类的默认打开程序。
+- `calculator`：旧 Qt5 仓库已解除归档但代码整体重写，打的是新仓库。只要
+  `cutefish-toolkit`，另有 `calculator-engine` / `calculator-ui` 两个静态库；
+  图标由 `cmake/EmbedIcons.cmake` 编成 `icons.cpp` 塞进二进制，产物只有
+  `bin/` 和 `.desktop`。
+- `preview`：图片 + PDF 查看器，要 framework 的 `CutefishFiles` /
+  `CutefishPdf` 和 `libpng`；渲染丢给 `pdfworker` 线程，用 `Cutefish::Pdf`
+  的渐进渲染接口。`MimeType` 声明 image/*（含 avif/jxl）与
+  `application/pdf`，装上就是这两类的默认打开程序。
 
-两个的 `tests/` 都要 GTest，`BUILD_TESTING=OFF` 关掉即可。
-
-## 七、cutefish-computer-use（Rust MCP server）
+## 五、cutefish-computer-use（Rust MCP server）
 
 不是 toolkit 应用，是独立的 Rust 二进制（stdio MCP server），让 agent app
 在用户同意后看屏幕、控制指针键盘。上游 `publish = false` 且没提交

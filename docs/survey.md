@@ -1,253 +1,205 @@
-# CutefishOS 移植调研
+# CutefishOS 移植调研与现状
 
-调研日期：2026-10-21。数据取自 GitHub API（组织 `cutefishos`）与
-`cutefishos/packaging` 的 `versions` / `debian/*/control`。
+调研起点 2026-10-21，最近整理 2026-11-16（PR #4 合并后）。
+上游数据取自 GitHub API 与 `cutefishos/packaging` 的 `versions` /
+`debian/*/control`。细节按主题分在 [toolkit.md](toolkit.md)、
+[core.md](core.md)、[apps.md](apps.md)；本机操作约定见 [`AGENTS.md`](../AGENTS.md)。
 
-## 当前进度（2026-11-16 更新）
+## 一、当前状态（2026-11-16）
 
-### 2026-11-16 打包 cutefish-computer-use：20/20 构建通过
-
-Rust 写的 MCP server（stdio），让 agent app 在用户同意后看屏幕、控制指针
-键盘。打包要点：
-
-- 仓库没提交 `Cargo.lock`（`publish = false`），本地用 cargo 1.98 生成一份
-  放进包目录，src derivation 里拷进去再让 `buildRustPackage` vendor；
-- `.cargo/config.toml` 把 crates.io 重定向到 Debian 的离线 registry
-  （`/usr/share/cargo/registry`），src derivation 里删掉；
-- 协议 XML 由 `wayland-scanner` 宏在编译期生成代码，运行时不读文件，纯
-  Rust 静态二进制（只链 glibc，2.1M）；
-- compositor 启动时按 PATH 找 `cutefish-computer-use` 做 canonical 校验，
-  所以模块加了默认关闭的 `services.desktopManager.cutefish.computerUse.enable`，
-  打开才把它放进 `systemPackages`（隐私敏感，默认不装）。
-- 冒烟：喂 MCP `initialize` + `tools/list`，握手成功、列出 22 个工具。
-
-### 2026-11-16 新增 calculator 与 preview：19/19 构建通过
-
-两个 2026-11 才出现的应用补上了。都是 toolkit 应用，没有额外的路径适配，
-desktop 文件里的 `Exec` 本来就是裸命令名：
-
-- `calculator`：重写版（旧的 Qt5 仓库已解除归档但在 `packages/` 里是另一份
-  代码），只要 `cutefish-toolkit`；图标由 `cmake/EmbedIcons.cmake` 编进二进制。
-- `preview`：图片/PDF 查看器，`find_package` 要 `CutefishToolkit` +
-  `CutefishFiles` + `CutefishPdf`，后面两个都在 framework 里 —— 上一节把
-  PDFium 改链 nixpkgs 之后这条路才通。另需 `libpng`（`pkg_check_modules`）。
-- 两个都 `include(CTest)` 且 tests 要 GTest，`BUILD_TESTING=OFF`。
-- 都加进了 `nixos-modules/cutefish.nix` 的 `systemPackages`；`preview` 的
-  desktop 声明了 image/* 与 application/pdf，装上即是这两类的默认打开程序。
-
-### 2026-11-16 全量升级：17/17 重新构建通过
-
-17 个包全部升到各自仓库的最新提交（多数是 2026-11-15 的 HEAD；
-`xdg-desktop-portal-cutefish` 停在 11-04、`qt-plugins` 11-01、`wallpapers`
-11-13，那也是它们各自的最新）。`cutefish-skia` 跟着 toolkit 换了引脚
-（`95ee33d` → `ea1e651`，仍是 `chrome/m156`）。这次升级要处理的适配：
-
-- **framework 新增 `pdf/` 组件**：上游把它 pin 死的一份 PDFium
-  （`chromium/8158`，`scripts/fetch-pdfium.sh`）编成 hidden object 塞进
-  `cutefish-pdf`。Nix 侧改成链接 nixpkgs 的 `pdfium`（8066）：补丁加了
-  `-DCUTEFISH_PDFIUM_SYSTEM`，走 `find_path`/`find_library`，源码不动
-  （`#include "public/fpdf_*.h"` 在 `${pdfium.dev}/include` 下原样成立）。
-  API 面抽查齐全，`hello.pdf` 的取页数、文本、渲染都跑通了；版本差 92 个
-  chromium 分支，`FPDF_LIBRARY_CONFIG` 仍用 version 2。
-- **framework 新增账号头像**：`/usr/share/cutefish/avatars` 改成
-  `/run/current-system/sw/share/cutefish/avatars`（头像文件随 wallpapers 包
-  发，不能让一个库反过来依赖它，何况它 unfree）；`artwork.nix` 的
-  `pathsToLink` 相应加了 `/share/cutefish`。
-- **compositor 新增 `/usr/bin/reef`**（注释里叫 "compatibility runtime"，
-  组织里没有对应仓库）：四类 companion 可执行文件统一改成按 PATH 查找再
-  `canonical()` 解析，仍然只编译自己的 store 路径进二进制。
-- **core 新增 `applicationsfolder`**：system D-Bus + systemd unit + polkit
-  action 各一个，模块里 `systemd.packages` / `services.dbus.packages` 自动
-  收走，不用改。
-- **filemanager 新增 `cutefish-mountd`**（手机/网络盘/磁盘镜像走 FUSE）：
-  多出 `bzip2`、`xz`、`lzfse` 三个依赖。
-- **wallpapers 新增 `avatars/`**：安装目标同样是绝对 `/usr/share`，一并改。
-- 上游已自己修掉、因此删掉的两个补丁：framework 的 `<spa/pod/iter.h>`、
-  compositor 的 `<cstdint>`。
-- VM 的 `nixosConfigurations.vm` 仍能求值；真机/VM 会话依旧未验。
-
-**下次升级注意**：`icons` 的 hash 用 `nix hash path` 算会偏（两万多个文件、
-大量悬空符号链接），要以 `nix build` 报的 `got:` 为准。
-
-- 仓库只放 Cutefish：`packages/`（包集）、`nixos-modules/`（NixOS 模块）、
-  `vm/`（调试 VM）、`docs/`（本文档）。
-- `.gitignore` 忽略 `/src`：上游源码 clone / 快照目录，用
-  `git clone git@github.com:cutefishos/<repo>` 取（https 在本环境被代理拒）。
-- `packages/default.nix` 是包集入口，在 `flake.nix` 里以独立属性集接入
-  （`packages.<system>.cutefish-*`，另有 `legacyPackages.cutefish`）；
-  用 `lib.fix` 自举，不是 `lib.makeScope`。
-- **已构建通过（20/20，取自 2026-11-15 的 upstream HEAD；computer-use 是
-  11-14）**：`cutefish-skia`、`cutefish-toolkit`、`cutefish-framework`、
-  `cutefish-compositor`、`cutefish-core`、`cutefish-dm`、`cutefish-icons`、
-  `cutefish-wallpapers`、`cutefish-qt-plugins`、`cutefish-computer-use`、
-  `xdg-desktop-portal-cutefish`，以及应用 `text-editor` / `filemanager` /
-  `settings` / `terminal` / `video-player` / `calendar` / `system-monitor` /
-  `calculator` / `preview`。
-- NixOS 模块：`nixosModules.cutefish`（`default` 同义）→ `nixos-modules/`
-  （`cutefish.nix` 桌面入口 + `dm.nix` 显示管理器 + `artwork.nix` 图标/壁纸），
-  见第 5.1 节。已接上 wayland-sessions（`cutefish-core`）、D-Bus 系统服务、
-  udev、systemd unit、XDG portal、Qt 插件目录（`QT_PLUGIN_PATH`）、PipeWire，
-  以及 `cutefish-dm` 的全套接线（greeter 用户、两个 PAM 栈、
-  `display-manager.service` 别名、`/etc/cutefish-dm.conf`、PipeWire 的 user
-  drop-in）。详见 `docs/core.md` 第四、五节。
-- `vm/` 已换成真会话（cutefish-dm + cutefish-wayland），镜像构建通过；
-  **真机/VM 里的实际启动还没验过**（需要宿主 GPU 的 DRM/EGL，沙箱里没有）。
-  不开自动登录（开了就看不到登录界面，见 5.2 节）。
-- 剩余：`cutefish-installer` 不打（NixOS 有自己的安装器）。
-
-**有意留着没改的两处 FHS 路径**（都在 `framework` / `core` 里，理由见
-`docs/core.md` 第二节）：framework 的 VPN 插件扫描目录
-（`/usr/lib/NetworkManager/VPN`，接 `${networkmanager}` 会让每个应用的闭包
-多出一个 NetworkManager），以及 cutefish-locales 那套 Debian locale-gen 布局。
-
-> **取 hash 的小技巧**：本环境的 `nix-prefetch-url` 走代理会 502，且
-> `git ssh` 对大仓要 `--filter=blob:none`。实测最省事的是
-> `curl https://codeload.github.com/cutefishos/<repo>/tar.gz/<rev>`
-> （**必须 `env -u https_proxy -u HTTP_PROXY`，直连不走代理**）+ python
-> `tarfile` 解压 + `nix hash path --sri --type sha256 <内层目录>`，与
-> `fetchFromGitHub` 的 `hash` 完全一致（先在 `cutefish-toolkit` 上对齐过：
-> 结果与既有包的 hash 逐字符相同）。
-
-## 一、结论速览
-
-- **26 个公开仓库**（2026-11 复核；新增 `cutefish-webkit`、`preview`，
-  `calculator` 解除归档重写），其中真正需要打成 Nix 包的 **20 个**（另 1 个是
-  纯元包 `cutefish-desktop`），余下 5 个是组织配置 / 打包脚本 / 官网 / 空壳仓库。
+- **20/20 个包构建通过**：`cutefish-skia`、`cutefish-toolkit`、
+  `cutefish-framework`、`cutefish-compositor`、`cutefish-core`、`cutefish-dm`、
+  `cutefish-icons`、`cutefish-wallpapers`、`cutefish-qt-plugins`、
+  `xdg-desktop-portal-cutefish`、`cutefish-computer-use`，以及应用
+  `text-editor` / `filemanager` / `settings` / `terminal` / `video-player` /
+  `calendar` / `system-monitor` / `calculator` / `preview`。
 - **技术栈已换代**：不再是早期 Cutefish 0.x 的 Qt5 + KF5 路线，而是自研
-  toolkit（Wayland 客户端 + **Skia** 在 GLES 上绘制），C++20。Qt 只在可选的
-  `qt-plugins`（Qt6 平台主题）里出现。
-- **上游不发布 tag**：最新 tag 仍是 `0.8`，而 `packaging/versions` 里全部是
-  `1.0`；上游 CI 直接按 `git ls-remote HEAD` 的 commit 构建。Nix 侧必须钉
-  commit + 手写 hash，且要自己准备批量更新脚本。
-- **最大难点是 Skia**：`cutefish-toolkit` 用 `ExternalProject_Add` 在构建期
-  现场编译一份 pin 死的 Skia（`chrome/m156`），需要 `gn` + `ninja` + `clang`，
-  并且 gn 只从源码树内部路径查找。这是整个移植里唯一"非标准"的重活。
-- **系统集成面比 DDE 小**：没有 dconfig / gsettings 双配置体系，服务是普通
-  D-Bus 服务；但要接 PAM、polkit agent、udev、XDG portal、wayland-sessions。
-- 粗估：**L0（Skia + toolkit）3–5 人日走通**，L1 框架与合成器 3–5 人日，
-  L2 会话/登录 + NixOS 模块 4–6 人日，之后每个小应用 0.5–1 人日。
+  toolkit（Wayland 客户端 + Skia 在 GLES 上绘制）、C++20；Qt 只出现在可选的
+  `qt-plugins`（Qt6 平台主题）里。系统集成面比 DDE 小：没有 dconfig /
+  gsettings 双配置体系，服务是普通 D-Bus 服务，但要接 PAM、polkit agent、
+  udev、XDG portal、wayland-sessions。
+- **模块与 VM**：`nixosConfigurations.vm` 求值通过，VM 镜像能构建。
+  **真机 / VM 里的实际会话启动仍未验证**：沙箱没有宿主 GPU 的 DRM/EGL。
+- **模块接线**已覆盖 wayland-sessions、system/user D-Bus、udev、systemd unit、
+  XDG portal、Qt 插件路径（`QT_PLUGIN_PATH`）、PipeWire、`cutefish-dm`
+  全套（greeter 用户、PAM 栈、`display-manager.service` 别名、
+  `/etc/cutefish-dm.conf`、PipeWire user drop-in）。详见
+  [core.md](core.md) 第五、六节。
+- **有意不打**：`cutefish-installer`（NixOS 有自己的安装器）、
+  `cutefish-webkit`（WebKit 分支，体量不值当）。
+- 上游不发布 tag（最新仍是 `0.8`，而 `packaging/versions` 写 `1.0`），
+  每个包钉 commit。`toolkit` / `framework` / `compositor` / `core`
+  之间跑私有 Wayland 协议，必须同日一起升级。
 
-## 二、仓库总览
+## 二、上游仓库概览
 
-| 仓库 | 语言 | ★ | 归类 | 移植 |
-|---|---|---|---|---|
-| cutefish-toolkit | C++ | 225 | L0 自研 UI 工具包（内嵌 Skia） | 必须，最先 |
-| cutefish-framework | C++ | 23 | L1 系统能力客户端（声音/网络/蓝牙/电源） | 必须 |
-| cutefish-compositor | C++ | 103 | L1 Wayland 合成器 + shell（dock/通知/控制中心） | 必须 |
-| cutefish-dm | C++ | 53 | L2 显示管理器（PAM + greeter + session） | 必须 |
-| cutefish-core | C++ | 278 | L2 会话、系统服务、polkit agent、录屏 | 必须 |
-| filemanager | C++ | 122 | L3 应用 | 是 |
-| settings | C++ | 63 | L3 应用 | 是 |
-| terminal | C++ | 52 | L3 应用（GPL-3.0） | 是 |
-| text-editor | C++ | 16 | L3 应用 | 是 |
-| video-player | C++ | 7 | L3 应用 | 是 |
-| calendar | C++ | 0 | L3 应用 | 是 |
-| system-monitor | C++ | 0 | L3 应用 | 是 |
-| xdg-desktop-portal-cutefish | C++ | 0 | L3 门户后端 | 必须（桌面功能完整性） |
-| cutefish-computer-use | Rust | 0 | AI 控制（MCP server，wayland + 截图编码） | 是（模块里 opt-in） |
-| cutefish-installer | C++ | 0 | 安装器（分区/daemon/polkit） | 否（NixOS 不需要） |
-| cutefish-webkit | C++ | 0 | 自研 WebKit（WPE 派生，2026-11 新增） | 暂不（体量） |
-| preview | C++ | 0 | 图片/PDF 查看器（2026-11 新增） | 是 |
-| qt-plugins | C++ | 14 | Qt6 平台主题/图片格式/滚动（Qt6） | 可选 |
-| icons | CMake | 40 | 图标主题（GPL-3.0） | 是 |
-| wallpapers | CMake | 58 | 壁纸 + 账号头像（许可标注 NOASSERTION，需人工确认） | 是 |
-| calculator | C++ | 12 | 已解除归档，重写为 toolkit 应用（2026-11） | 是 |
-| cutefish-desktop | — | — | 纯元包（仅存在于 packaging 的依赖集合） | 否（用 NixOS 模块代替） |
-| packaging | Shell | 0 | Debian 打包 + CI | 否（但 `debian/control` 是依赖权威来源） |
-| .github | Shell | 0 | 组织配置 + CI | 否 |
-| website（现 `cutefishos.github.io`） | Astro | 0 | 官网 | 否 |
-| getting-started | — | 18 | 只有 README/LICENSE | 否 |
-| plymouth-theme | — | 3 | 2021 年后停更 | 否 |
+26 个公开仓库（2026-11 复核），其中 20 个需要打成 Nix 包，1 个纯元包
+`cutefish-desktop`（由 NixOS 模块代替），其余 5 个是组织配置 / 打包脚本 /
+官网 / 空壳仓库。
+
+| 仓库 | 语言 | 归类 | 移植 |
+|---|---|---|---|
+| cutefish-toolkit | C++ | 自研 UI 工具包（内嵌 Skia） | 必须，最先 |
+| cutefish-framework | C++ | 系统能力客户端（声音/网络/蓝牙/电源/PDF/头像） | 必须 |
+| cutefish-compositor | C++ | Wayland 合成器 + shell（dock/通知/控制中心） | 必须 |
+| cutefish-dm | C++ | 显示管理器（PAM + greeter + session） | 必须 |
+| cutefish-core | C++ | 会话、系统服务、polkit agent、录屏 | 必须 |
+| filemanager | C++ | 应用 | 是 |
+| settings | C++ | 应用 | 是 |
+| terminal | C++ | 应用（GPL-3.0） | 是 |
+| text-editor | C++ | 应用 | 是 |
+| video-player | C++ | 应用 | 是 |
+| calendar | C++ | 应用 | 是 |
+| system-monitor | C++ | 应用 | 是 |
+| calculator | C++ | 2026-11 解除归档并重写为 toolkit 应用 | 是 |
+| preview | C++ | 2026-11 新增的图片/PDF 查看器 | 是 |
+| xdg-desktop-portal-cutefish | C++ | 门户后端 | 必须（桌面功能完整性） |
+| cutefish-computer-use | Rust | AI 控制（MCP server，wayland + 截图编码） | 是（模块 opt-in） |
+| qt-plugins | C++ | Qt6 平台主题/图片格式/滚动 | 可选 |
+| icons | CMake | 图标主题（GPL-3.0） | 是 |
+| wallpapers | CMake | 壁纸 + 账号头像（许可 NOASSERTION，需人工确认） | 是（unfree） |
+| cutefish-skia | — | 上游 toolkit 内嵌的 pinned Skia，单独打成 derivation | 必须 |
+| cutefish-installer | C++ | 安装器（分区/daemon/polkit） | 否 |
+| cutefish-webkit | C++ | 自研 WebKit（WPE 派生，2026-11 新增） | 暂不（体量） |
+| cutefish-desktop | — | 纯元包 | 否 |
+| packaging | Shell | Debian 打包 + CI | 否（`debian/control` 是依赖权威来源） |
+| .github | Shell | 组织配置 + CI | 否 |
+| website（cutefishos.github.io） | Astro | 官网 | 否 |
+| getting-started / plymouth-theme | — | 只有 README / 2021 年后停更 | 否 |
 
 组织描述已改为 "A beautiful, agentic Linux distribution, formerly CutefishOS"，
-日更活跃（本次调研当天仍有提交），方向明显转向 AI agent 桌面
-（`cutefish-computer-use`、compositor 的 `cutefish-computer-control-v1` 协议、
-core 里的"记住允许的 agent 应用"）。
+方向明显转向 AI agent 桌面：`cutefish-computer-use`、compositor 的
+`cutefish-computer-control-v1` 协议、core 里"记住允许的 agent 应用"。
 
 ## 三、依赖分层
 
 ```
-cutefish-toolkit  ──►  Skia(pinned, 源码编译) + wayland-client + EGL/GLES
+cutefish-toolkit  ──►  pinned Skia(chrome/m156, 源码编译) + wayland-client + EGL/GLES
        ▲                  + fontconfig/freetype/harfbuzz/icu + png/jpeg/webp/tiff/heif/jxl
        │
-cutefish-framework ──► pipewire, systemd, icu, png  （clients: 音频/网络/蓝牙/电源）
-       ▲
+cutefish-framework ──► pipewire, systemd, icu, png, fontconfig + nixpkgs pdfium
+       ▲                  (clients: 音频/网络/蓝牙/电源/PDF/头像)
     ┌──┴───────────────┬─────────────────┐
 cutefish-compositor  cutefish-core     cutefish-dm
  (wayland/seat/drm/  (session, services,(pam, systemd,
   gbm/input/udev/     polkit-agent,      dbus policy)
   xcb/xwayland/pw)    ffmpeg/va/vaapi)
        ▲
-    应用：filemanager / settings / terminal / text-editor / video-player
-          calendar / system-monitor / xdg-desktop-portal-cutefish
+    应用：filemanager / settings / terminal / text-editor / video-player /
+          calendar / system-monitor / calculator / preview /
+          xdg-desktop-portal-cutefish
        ▲
-    artwork：icons / wallpapers；可选：qt-plugins(Qt6) / computer-use(Rust)
+    artwork：icons / wallpapers(unfree)；可选：qt-plugins(Qt6)
+    独立：cutefish-computer-use(Rust MCP server，不依赖 C++ 协议栈)
 ```
 
 **强耦合警告**：toolkit 与 compositor 之间跑自研 wayland 协议
 （`cutefish-shell-v1`、`cutefish-surface-blur-v1`、`cutefish-window-hints-v1`、
-`cutefish-computer-control-v1`），两侧必须同版本构建。overlay 里要一次性
-升级这一组，不能各自追 HEAD。
+`cutefish-computer-control-v1`），两侧必须同版本构建，不能各自追 HEAD。
 
 ## 四、外部依赖 → nixpkgs
 
 | 上游依赖 | nixpkgs | 备注 |
 |---|---|---|
-| wayland / wayland-protocols **>= 1.39** | `wayland` `wayland-protocols` | 版本要求较新，需确认当前 nixpkgs rev 达标 |
+| wayland / wayland-protocols >= 1.39 | `wayland` `wayland-protocols` | 已确认当前 lock 里是 1.49 |
 | egl / glesv2 / libdrm / libgbm | `libglvnd` `mesa` | |
-| libseat / libinput / libudev | `seatd` `libinput` `systemd` | |
+| libseat / libinput / libudev | `seatd` `libinput` `systemd` | seatd 0.9.3 可用 |
 | xkbcommon / xcb* / Xwayland | `libxkbcommon` `xorg.libxcb*` `xwayland` | compositor 内置 xwayland 支持 |
-| pipewire >= 0.3 | `pipewire` | 录屏 + greeter 静音 drop-in |
-| ffmpeg (avcodec/avformat/avutil/swscale) + libva | `ffmpeg` `libva` | 仅 core 录屏 |
-| fontconfig / freetype2 / harfbuzz / icu | 同名 | |
+| pipewire >= 0.3 | `pipewire` | 录屏 + greeter 静音 drop-in；1.6.9 可用 |
+| ffmpeg + libva | `ffmpeg` `libva` | 仅 core 录屏 |
+| fontconfig / freetype2 / harfbuzz / icu | 同名 | framework 的系统字体与 pdfium 补丁要显式 pkg-config |
+| PDFium（上游 pin `chromium/8158`） | `pdfium`（8066） | 补丁切到系统库，见下 |
 | png/jpeg/webp/tiff/heif/**jxl** | 同名 | jxl 是运行时 `dlopen`，CMake 会 objdump 校验 SONAME |
 | libsystemd / PAM / polkit | `systemd` `pam` `polkit` | |
-| clang + gn + ninja | `clang` `gn` `ninja` | **仅 Skia 构建需要，gn 在 nixpkgs 有** |
-| GoogleTest（仅测试） | `gtest` | 全部仓库默认 `BUILD_TESTING=OFF` |
+| clang + gn + ninja | `clang` `gn` `ninja` | 仅 Skia 构建需要；clang 21.1.8 / gn 2026-08-14 / ninja 1.13.2 可用 |
+| GoogleTest（仅测试） | `gtest` | 所有仓库 `BUILD_TESTING=OFF` |
 
-运行期依赖服务（NixOS 模块里要开）：`accountsservice`、`polkit`、
-`gsettings-desktop-schemas`、`power-profiles-daemon`、`udisks2`、`fuse3`、
-`NetworkManager`、`bluez`、`gnome-keyring`、`upower`、`pipewire + wireplumber`。
+运行期依赖服务：`accountsservice`、`polkit`、`power-profiles-daemon`、`udisks2`、
+`fuse3`、`NetworkManager`、`bluez`、`gnome-keyring`、`upower`、
+`pipewire + wireplumber`。
 
-## 五、NixOS 模块要接的系统集成点
+## 五、已落地的关键决策
+
+### 5.1 Skia 独立 derivation
+
+上游 `scripts/fetch-skia.sh` pin 死 `chrome/m156`，构建期现场拉源码编译。
+复用 nixpkgs 的 skia 不可行：版本差 8 个 milestone、nixpkgs 是共享库且未开
+Ganesh GL、头文件布局不同、缺 svg/skparagraph/skshaper/skunicode 等模块库。
+因此单独打 `cutefish-skia`（gn + ninja + clang，静态库 + 源码根布局头文件），
+toolkit 用补丁改为从 `CUTEFISH_SKIA` 取前缀。当前 pin
+`ea1e651d7a105f5ca327dfd65d28957957279e2e`，详见 [toolkit.md](toolkit.md)。
+
+### 5.2 framework 改用系统 PDFium
+
+上游新增的 `pdf/` 把 pin 死的 PDFium 编成 hidden object 塞进 `cutefish-pdf`。
+`framework-system-pdfium.patch` 加 `-DCUTEFISH_PDFIUM_SYSTEM`，改为
+`find_path` / `find_library` 链接 nixpkgs 的 pdfium（8066，与上游 pin 差 92 个
+chromium 分支）。API 面抽查齐全，`hello.pdf` 取页数 / 取文本 / 渲染均通过；
+`FPDF_LIBRARY_CONFIG` 仍用 version 2。源码的 `#include "public/fpdf_*.h"`
+在 `${pdfium.dev}/include` 下原样成立。
+
+### 5.3 FHS 路径逐条适配
+
+只 patch 真正会失败的 install 目标与可执行探测，不按模式批量 sed。
+`toolkit-xdg-paths.patch` 把数据/配置目录与可执行查找改读
+`XDG_DATA_DIRS` / `XDG_CONFIG_DIRS` / `PATH`；`compositor-nix-paths.patch`
+把 companion 可执行文件运行期按 PATH 查再 `canonical()`（core 反向依赖
+compositor，不能把它的 store 路径编进来）；wallpapers 的 `avatars/` 与壁纸
+安装路径改相对 `share/`，模块用 `environment.pathsToLink` 暴露
+`/share/cutefish`。详见 [toolkit.md](toolkit.md) 与 [core.md](core.md)。
+
+### 5.4 computer-use 的 lock 与 opt-in
+
+Rust MCP server 上游 `publish = false` 且没提交 `Cargo.lock`：本地用 cargo
+1.98 生成一份（44 crate）放进包目录，src derivation 里删掉指向 Debian 离线
+registry 的 `.cargo/config.toml` 再让 `buildRustPackage` vendor。协议 XML 编译期
+由 `wayland-scanner` 宏生成，运行时不读文件。compositor 启动按 PATH 找它并做
+canonical 校验，所以模块里默认关闭、打开才进 `systemPackages`。MCP 握手与
+22 个工具的冒烟已通过。详见 [apps.md](apps.md) 第五节。
+
+### 5.5 批量升级
+
+上游日更，全部钉 commit。批量取 HEAD 与 tarball hash 的脚本在
+`/home/ut004971@uos/cf-update/`（不进仓库）。`icons` 有两个多万个文件和大量
+悬空符号链接，`nix hash path` 会偏，要以 `nix build` 报的 `got:` 为准。
+本机取 hash / 取源码的做法见第八节。
+
+## 六、NixOS 模块集成点
+
+`flake.nix` 暴露 `nixosModules.cutefish`（`default` 同义），注入自己的 overlay，
+`pkgs.cutefish.*` 在模块外也能直接用。模块文件为 `nixos-modules/cutefish.nix`
+（桌面总入口）、`dm.nix`（显示管理器）、`artwork.nix`（图标与壁纸）。
+
+选项：
+
+```nix
+services.desktopManager.cutefish.enable = true;                 # 桌面总开关
+services.desktopManager.cutefish.displayManager.enable = true;  # 默认开，可用别的 DM
+services.desktopManager.cutefish.computerUse.enable = false;    # 隐私敏感，默认不装
+services.cutefish.artwork.enable = true;                        # 图标/壁纸
+services.cutefish.artwork.wallpapers.enable = true;             # 壁纸是 unfree
+```
 
 | 类型 | 出处 | NixOS 侧做法 |
 |---|---|---|
-| systemd system unit | `cutefish-dm/data/cutefish-dm.service`（装到 `/usr/lib/systemd/system`） | `systemd.services.cutefish-dm` 或 `systemd.packages` |
-| systemd user drop-in | dm 给 `pipewire*.{service,socket}`、`wireplumber.service` 写 `no-greeter-audio.conf`；core 给 `xdg-document-portal.service.d` 写 `document-portal-stop.conf` | drop-in 目录要改成 `$out` 下，并在模块里 `systemd.user.services.<x>.path` 或直接用 `environment.etc` |
-| PAM | `cutefish-dm.pam`、`cutefish-dm-greeter.pam`（装到 `/etc/pam.d`） | `security.pam.services.cutefish-dm{,-greeter}` |
-| D-Bus system policy | `org.cutefish.DisplayManager.conf`、`org.cutefish.Locales.conf`、`org.cutefish.Installer.conf` | `services.dbus.packages` |
-| D-Bus 服务 | core 下 `org.cutefish.{Appearance,Battery,Power,Locales,Privacy,Language,NightLight,Services.Brightness}` + `AppRuntime` 的 `*.service.in` | 同上，`services.dbus.packages` |
-| polkit | core 自带 **polkit-agent**（`polkit-agent/`），installer 带 `.policy` | `security.polkit.enable` + 把 agent 挂进会话自启动；polkit 规则文件随包 |
+| systemd system unit | dm / core 的 unit（原装到 `/usr/lib/systemd/system`） | `systemd.packages` / `systemd.services` |
+| systemd user drop-in | dm 给 pipewire 写静音 drop-in；core 给 document-portal 写 stop drop-in | 铺到 `$out/lib/systemd/user/...` 并由模块接管 |
+| PAM | `cutefish-dm{,greeter}.pam` | `security.pam.services.<n>`（NixOS 没有 `@include common-*`） |
+| D-Bus system policy / 服务 | core 的一批 `*.service.in`、dm / core 的 policy | `services.dbus.packages` |
+| polkit | core 自带 polkit-agent | `security.polkit.enable` + agent 进会话 |
 | udev rules | `60-cutefish-ddc.rules`、`60-cutefish-privacy.rules` | `services.udev.packages` |
-| wayland-sessions | `core/session/cutefish-wayland.desktop` + `cutefish-wayland-session` 脚本 | 装进 `share/wayland-sessions`，配合 dm 或 `displayManager.sessionPackages` |
-| 用户/组 | Debian `postinst` 里 `adduser` | `users.users.<cutefish>`（需确认名字，见待验证） |
-| XDG portal | `xdg-desktop-portal-cutefish` | `xdg.portal.extraPortals` + `xdg.portal.config` |
-| fontconfig | `cutefish-services/appearance/fontconfig.conf`（模板 `.in`） | 作为配置文件随包，运行期生成用户配置 |
-| 录屏/截图权限 | pipewire + `cutefish-computer-control-v1` 协议 | 走 portal；agent 授权目前是 core 里的自研 prompt |
+| wayland-sessions | `core/session/cutefish-wayland.desktop` | `services.displayManager.sessionPackages` |
+| XDG portal | `xdg-desktop-portal-cutefish` | `xdg.portal.extraPortals`，backend `cutefish;gtk`（我们只实现 4 个接口） |
+| MIME 默认程序 | `preview.desktop` 声明 image/* 与 application/pdf | `xdg.mime.defaultApplications`（`mkDefault`，用户可覆盖） |
+| Qt 插件 | `cutefish-qt-plugins` 装在 qtbase 之外 | `environment.variables.QT_PLUGIN_PATH` |
+| fontconfig | `cutefish-services/appearance/fontconfig.conf` | 随包安装，运行期生成用户配置 |
 
-### 5.1 已落地的模块
+`systemd.packages` 只**链接** unit，不会自动 enable：locales / privacy 分别由
+D-Bus system bus 激活和 udev tag 触发。`cutefish-wallpapers` 是
+`unfreeRedistributable`（Unsplash License），默认装，整机需要
+`nixpkgs.config.allowUnfree = true`；关掉 artwork 的 wallpapers 开关即可免此要求。
 
-`flake.nix` 暴露 `nixosModules.cutefish`（另有 `default` 指向同一个模块），它
-注入自己的 overlay（`pkgs.cutefish = import ./packages { pkgs = final; }`），
-所以 `pkgs.cutefish.*` 在模块外也能直接用：
-
-```nix
-services.desktopManager.cutefish.enable = true;   # 拉起 artwork + 桌面基础
-services.cutefish.artwork.enable = true;          # 只想用图标/壁纸时可单独开
-services.cutefish.artwork.wallpapers.enable = false;  # 壁纸是 unfree，可关
-```
-
-- `artwork.nix`：`cutefish-icons` 进 `systemPackages`（靠 `xdg.icons` 被找到），
-  壁纸另需 `environment.pathsToLink = [ "/share/backgrounds" "/share/wallpapers" ]`。
-- **`cutefish-wallpapers` 是 `unfreeRedistributable`**（Unsplash License），
-  默认装，所以整机会要求 `nixpkgs.config.allowUnfree = true`（或
-  `allowUnfreePredicate`）；关掉上面那个开关即可免此要求。
-- `cutefish.nix` 是桌面总入口：应用、wayland-session、D-Bus、udev、systemd
-  unit、portal、Qt 插件目录、PipeWire 都在这里；`dm.nix` 单独负责
-  `cutefish-dm`（PAM、greeter 用户、`display-manager.service`）。
-
-模块求值验证方式（新文件必须先 `git add`，否则 `git+file://` 取不到）：
+模块求值验证（新文件必须先 `git add`，`git+file://` 只取已跟踪文件）：
 
 ```bash
 nix eval --impure --expr '
@@ -265,157 +217,49 @@ in (flake.inputs.nixpkgs.lib.nixosSystem {
 
 ### VM
 
-`vm/` 是独立 flake（`inputs.cutefish-nixos.url = ".."` +
-`qemu-vm.nix`，8 核 / 8G / 16G 盘，2223 端口转发 ssh，virtio-vga-gl）。
+`vm/` 是独立 flake（`inputs.cutefish-nixos.url = ".."` + `qemu-vm.nix`，
+8 核 / 8G / 16G 盘，2223 端口转发 ssh，virtio-vga-gl）：
 
 ```bash
 cd vm
-nix build --no-write-lock-file --impure   # 或只 eval toplevel.drvPath
+nix build --no-write-lock-file --impure
 ./result/bin/run-nixos-vm
 ```
 
 起的就是真会话：`cutefish-dm` 占 tty1（登录界面 = `cutefish-compositor
---login`，跑在 `cutefish-greeter` 用户下），`cutefish-wayland`（core 监督
-compositor）在 tty2，手动输 `test`/`test` 进会话。
+--login`，跑在 `cutefish-greeter` 用户下），`cutefish-wayland` 在 tty2，手动输
+`test`/`test` 进会话。**要看登录界面就别开自动登录**：设了
+`services.displayManager.autoLogin` 后 `Daemon::autologin()` 成功就直接
+`login()`，不启动 greeter。vm 里开了 `allowUnfree`（壁纸）。调试可 ssh 2223
+看 `journalctl -u cutefish-dm` / `-u display-manager`，会话日志在
+`~/.local/state/cutefish*`；会话挂了还能从 tty2+ 的 getty 登进去。
 
-**要看登录界面就别开自动登录**：`services.displayManager.autoLogin` 一旦设置，
-模块会往 `/etc/cutefish-dm.conf` 写 `[Autologin]`，而 `Daemon::autologin()`
-成功就直接 `login()`、**不启动 greeter**（只有登录失败才回退到登录界面），
-所以界面永远看不到。vm 里那几行默认注释掉了。注意 vm 里开了
-`nixpkgs.config.allowUnfree = true`（壁纸）。
+## 七、已知限制与后续
 
-调试入口：ssh 2223 进去看 `journalctl -u cutefish-dm`、`-u display-manager`，
-会话自己的日志在 `~/.local/state/cutefish*`（toolkit 的日志分类）。会话起不来
-时 tty2+ 的 getty 还能登（unit 里 `Conflicts=getty@tty1.service`，只让出 tty1）。
+- **实机 / VM 会话未验证**：需要宿主 GPU 的 DRM/EGL，构建沙箱里没有。
+- **jxl 运行期 `dlopen`**：CMake 已用 objdump 校验 SONAME，实际能否找到库
+  待实机验证（可能要 wrap `LD_LIBRARY_PATH`）。
+- **许可证**：`icons` 是 GPL-3.0、`wallpapers` 标注 NOASSERTION，写
+  `meta.license` 前要人工确认实际 LICENSE 文本。
+- **compositor 引用的 `/usr/bin/reef`**：上游注释称 "compatibility runtime"，
+  组织里没有对应仓库，目前按 PATH 查、找不到就不启用。
+- **上游仍在变**：日更且方向转向 AI agent，`cutefish-webkit` 等新仓库还没打。
+  推进前先冻结一组同日 commit。
+- 有意留着的两处 FHS 路径（理由见 [core.md](core.md) 第二节）：framework 的
+  VPN 插件扫描目录（接 `${networkmanager}` 会让每个应用闭包多一个
+  NetworkManager）、cutefish-locales 的 Debian locale-gen 布局。
 
-## 六、移植难点（按风险排序）
+## 八、本机操作备忘
 
-### 1. Skia 内嵌构建（最高风险）
+- `nix-prefetch-url` 走代理必 502。取 hash 用直连 codeload + python `tarfile`
+  解压 + `nix hash path --sri --type sha256 <内层目录>`；Skia 的 tarball
+  80M 但只有约 80 KB/s，要 35–40 分钟，别随便重下。
+- `nix build` 自己能下 github archive，所以最省事的是先填个 hash 构建，
+  从报错的 `got: sha256-...` 里取真值（`icons` 只能用这个办法）。
+- 看源码用 ssh 稀疏检出（https 被代理拒，root 下要显式指定密钥）：
 
-`toolkit/scripts/fetch-skia.sh` + `toolkit/cmake/Skia.cmake`：
-
-- 固定 `SKIA_REVISION=95ee33d7ec7791ab9c071675710a14fe6408ae4f`
-  （分支 `chrome/m156`，2026-09-29 的提交）。
-- 用 `git clone --filter=blob:none --depth 1` + `sparse-checkout set --cone
-  bin build_overrides experimental/ffmpeg gn include modules src third_party`
-  取部分源码，然后 `python3 bin/fetch-gn` 从网络拉 gn 二进制。
-- CMake 侧 `ExternalProject_Add(skia-build)`：`gn gen` → `ninja -C <dir>
-  skia modules/svg modules/skresources modules/skparagraph modules/skshaper
-  modules/skunicode` → 产出 8 个静态库
-  （`svg skresources skparagraph skshaper skunicode_icu skunicode_core skia skcms`）。
-- 三个必须绕过的点：
-  1. `find_program(SKIA_GN gn PATHS ${SKIA_SOURCE_DIR}/bin NO_DEFAULT_PATH REQUIRED)`
-     —— **只认源码树里的 gn**，nixpkgs 的 gn 要在解包后软链进去
-     （`ln -s ${gn}/bin/gn third_party/skia/bin/gn`），否则 patch 掉 `NO_DEFAULT_PATH`。
-  2. `find_program(SKIA_CC clang REQUIRED)` —— 必须给 `clang`，gcc 未经上游验证。
-  3. 构建期无网络，`fetch-skia.sh` 不能跑，源码要预取。
-
-建议做法：
-
-```nix
-# 1) 固定输出 derivation 预取 Skia 源码（github.com/google/skia 镜像含该 rev）
-skiaSrc = fetchFromGitHub {
-  owner = "google"; repo = "skia";
-  rev = "95ee33d7ec7791ab9c071675710a14fe6408ae4f";
-  hash = "sha256-...";   # 仓库约 1.2 GB，tarball 较大，只取一次
-};
-
-# 2) 把 Skia 单独打成 derivation，toolkit 通过 args.gn 复用，避免每次重编
-```
-
-**强烈建议先给上游提 issue/PR**：让 `Skia.cmake` 支持"外部已构建好的 Skia"
-（`SKIA_BUILD_DIR` / `SKIA_LIB_DIR` 可传入、跳过 `ExternalProject`）。否则
-toolkit 每次改动都会触发 Skia 全量重编（几十分钟），且无法被 Nix 缓存复用。
-
-### 2. 上游无 tag，16 个仓库要钉 commit
-
-无语义化版本可跟。做法：写一个脚本按 `packaging/versions` 的顺序批量取 HEAD →
-更新 `rev`/`hash`（`src/fetch.py` 只是取源码看代码用，不负责改包定义）。
-注意 compositor/toolkit/core 必须**同日** commit，避免协议错配。
-
-批量升级的实际流程（2026-11-16 走过一遍，脚本在 `/home/ut004971@uos/cf-update/`，
-不进仓库）：
-
-```bash
-# 1) HEAD + 提交时刻（version 用提交时刻的本地日期，UTC+8）
-gh api repos/cutefishos/<repo>/commits/main --jq '.sha, .commit.committer.date'
-# 2) tarball 直连下载（必须去掉代理）
-env -u https_proxy -u HTTPS_PROXY curl -sSL -o x.tgz \
-  https://codeload.github.com/cutefishos/<repo>/tar.gz/<rev>
-# 3) python tarfile 解压后算 hash（icons 例外，见下）
-nix hash path --sri --type sha256 <内层目录>
-```
-
-`curl` 的 `content-length` 是 chunked、看不到进度；skia 的 tarball 只有 80M
-（解压 217M），比文档早期估计的 ">500 MB" 小得多。
-
-### 3. 硬编码 FHS 路径
-
-按文件数粗查（GitHub 代码搜索）：core 16 个文件、compositor 17 个、dm 5 个、
-framework 2 个含 `/usr/`。类型集中且可预期：
-
-- `/usr/lib/systemd/system`、`/usr/lib/systemd/user/*.d`（**已知具体 install 目标**）
-- `/etc/pam.d`（`CMAKE_INSTALL_FULL_SYSCONFDIR`）
-- `/usr/share/...` 数据（光标主题、xsessions、壁纸、字体配置）
-- 少量可执行文件探测（`/usr/bin/...`）
-
-处理原则：**逐条回上游源码分类**，只 patch 真正会失败的
-（systemd unit 目标、pam.d、dbus service exec），不要按模式批量 sed ——
-`ReadWritePaths=-/usr/...`、注释、死代码都会误伤。
-
-### 4. D-Bus / polkit / PAM 的"运行期正确性"
-
-Cutefish 自己实现了 polkit agent 和一批系统服务，这一块在 NixOS 上不像 DDE
-那样有 dconfig 之类的历史包袱，反而好接；但 greeter 静音、document-portal
-停用这类 **drop-in** 要确保装到 `$out/lib/systemd/user/...` 并被加载。
-
-### 5. 可选件的取舍
-
-`cutefish-computer-use`（已打包）：Rust，`Cargo.toml` 里 `publish = false` 且
-没提交 `Cargo.lock`。用 cargo 1.98 本地 `generate-lockfile` 生成一份放进包
-目录（44 个 crate），src derivation 里删掉上游那份指向 Debian 离线 registry
-的 `.cargo/config.toml` 并把 lock 拷进去，再由 `buildRustPackage` 用
-`cargoHash` vendor。自研协议 XML 编译期由 `wayland-scanner` 宏生成代码，
-运行时不读文件。它让 agent 控制桌面，模块里默认关闭，开了才进
-`systemPackages`（compositor 按 PATH 做 canonical 校验）。
-
-## 七、建议实施路线
-
-| 阶段 | 内容 | 产出 |
-|---|---|---|
-| P0 | `cutefish-skia`（独立 derivation，预取源码 + gn/ninja/clang） | 一个能编出 8 个静态包的包 |
-| P1 | `cutefish-toolkit`（改 `Skia.cmake` 复用 P0；导出 `CutefishToolkitConfig.cmake`） | `nix build .#cutefish-toolkit` 通过 |
-| P2 | `cutefish-framework` → `cutefish-core` → `cutefish-compositor` | 三个包通过，协议版本对齐 |
-| P3 | `cutefish-dm` + `nixos-modules/`（PAM、dbus、udev、user、wayland-sessions） | VM 能进登录界面 |
-| P4 | 应用与 artwork（filemanager/settings/terminal/…/icons/wallpapers/portal） | 桌面可用 |
-| P5（可选） | `qt-plugins`、`cutefish-computer-use`（均已打包） | Qt 应用观感、AI 能力 |
-
-每个阶段结束跑 `nix build .#<pkg> --print-out-paths --no-link` 验证。
-
-## 八、本环境取 hash / 取源码的做法
-
-- **`nix build` 能下载 github.com 的 archive tarball**，但命令行
-  `curl` / `git clone https` / `nix-prefetch-url` 会被代理拒（CONNECT 502）。
-  所以取 hash 最省事的办法是：先随便填一个 hash 跑 `nix build`，从
-  `got: sha256-...` 里取真值。
-- 离线预估 hash（gh api tarball → python tarfile 解压 → `nix hash path`）对
-  普通仓库准确（wallpapers 一次命中），但对 `icons` 这种两万多文件、大量
-  悬空符号链接的仓库会偏 —— 仍以 nix 报的 `got:` 为准。
-- 看源码用 ssh：`GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=accept-new
-  -o UserKnownHostsFile=$HOME/.ssh/known_hosts -i $HOME/.ssh/id_ed25519"
-  git clone --filter=blob:none --depth 1 git@github.com:cutefishos/<repo>`。
-  （root 环境下 ssh 默认去找 /root/.ssh，必须显式指定。）
-
-## 九、待验证 / 风险
-
-- ~~当前 nixpkgs（flake.lock `6510408d`）的 `wayland-protocols` 是否 >= 1.39、
-  `gn` 是否可用~~ **已确认（2026-10-21）**：`wayland-protocols` 1.49、
-  `gn` 0-unstable-2026-08-14 都在；另有 ninja 1.13.2 / clang 21.1.8 /
-  libjxl 0.12.0 / pipewire 1.6.9 / seatd 0.9.3。Skia 那关没有缺件。
-- `icons` 是 GPL-3.0、`wallpapers` 许可 NOASSERTION：写 `meta.license` 前需
-  人工确认实际 LICENSE 文本。
-- `cutefish-dm` 的 Debian `postinst` 建的账号名与用途未细查，模块写
-  `users.users` 前要读一遍。
-- `cutefish-toolkit` 的 jxl 是运行期 `dlopen`，CMake 会 `objdump` 校验 SONAME，
-  Nix 下路径要确保能被找到（可能需要 wrap `LD_LIBRARY_PATH`）。
-- 上游日更且方向在变（AI agent），移植时建议先冻结一组 commit 再推进。
+  ```bash
+  export GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=accept-new \
+    -o UserKnownHostsFile=$HOME/.ssh/known_hosts -i $HOME/.ssh/id_ed25519"
+  git clone --filter=blob:none --depth 1 git@github.com:cutefishos/<repo>
+  ```
