@@ -1,18 +1,18 @@
 # cutefish-toolkit 移植
 
 上游：`github.com/cutefishos/cutefish-toolkit`（C++20，Wayland 客户端 + Skia 在
-GLES 上自绘）。它是整个移植的 L0：其余 12 个必打仓库都要
-`find_package(CutefishToolkit)`。
+GLES 上自绘）。它是整个移植的 L0：其余 C++ 包基本都要
+`find_package(CutefishToolkit)`（包清单见 [survey.md](survey.md)）。
 
 ## 一、Skia：为什么不直接用 nixpkgs 的 skia
 
 `cmake/Skia.cmake` 原本在构建期用 `ExternalProject_Add` 编译一份 pin 死的
-Skia（`scripts/fetch-skia.sh`：`chrome/m156`，rev `95ee33d7`）。nix 里网络与
+Skia（`scripts/fetch-skia.sh`：`chrome/m156`，当前 rev `ea1e651d`）。nix 里网络与
 缓存都不允许这么干，先评估了复用 `pkgs.skia`，结论是**不行**：
 
 | 项 | cutefish 需要 | nixpkgs 的 skia | 结论 |
 |---|---|---|---|
-| 版本 | m156（rev `95ee33d7`，pin 死） | m148（rev `e7c90ecc`） | 跨 8 个 milestone，上游 pin 死说明依赖该版本行为 |
+| 版本 | m156（rev `ea1e651d`，pin 死） | m148（rev `e7c90ecc`） | 跨 8 个 milestone，上游 pin 死说明依赖该版本行为 |
 | 库形态 | 静态库（`libskia.a` 等 8 个） | `is_component_build=true` → 共享库 | 缺 modules 的静态库 |
 | 后端 | Ganesh GL（`skia_use_gl/egl=true`） | 未开启 GL | `SK_GANESH`/`SK_GL` 后端不在库里 |
 | 头文件布局 | `#include "include/core/SkCanvas.h"`（-I 指向源码根） | 装成 `include/skia/...` 且把 `#include "include/` 改写成 `#include "` | 62 个源文件要改，跨版本还会再变 |
@@ -23,9 +23,11 @@ python3，系统库走 `skia_use_system_*`），但换成 cutefish 的 GN 参数
 
 ## 二、cutefish-skia
 
-- `fetchFromGitHub google/skia rev 95ee33d7`（GitHub 是上游 mirror，该 rev 在）。
-  hash `sha256-ou4cLjDBhKrL7yUJX/4el/HTDDWcmpL9ZGsdmHjX3I4=`（unpacked NAR）。
-  **取这个 hash 要完整下几百 MB，实测 35 分钟**，别随便重新生成。
+- `fetchFromGitHub google/skia rev ea1e651d7a105f5ca327dfd65d28957957279e2e`
+  （GitHub 是上游 mirror，该 rev 在），version `156-unstable-2026-11-06`，
+  hash `sha256-V1cKIFv6YCbEjqQk9hAgeITKyQaD2xYUnEWFW6772OE=`（unpacked NAR）。
+  tarball 80M / 解压 217M，codeload 只有约 80 KB/s，实测 35–40 分钟，
+  别随便重新生成；真要重算见下文「源码获取」。
 - GN 参数直接抄 `cmake/Skia.cmake` 里的 `SKIA_ARGS`（否则 `SK_*` defines 与
   编译出来的库对不上，类布局会错），另加 `target_cpu` / `cc` / `cxx` / `ar`
   和 `skia_use_system_*`（freetype、harfbuzz、icu、expat、libpng、jpeg、zlib）。
@@ -112,8 +114,10 @@ git checkout --detach FETCH_HEAD
 包定义里仍写 `fetchFromGitHub`（可移植）；本地验证阶段用
 `cutefish-skia.overrideAttrs (old: { src = ./cutefish/src/skia; })` 指过去。
 
-## 五、待办
+## 五、已知限制
 
 - `src/ui/jxl_library.cpp` 运行期 `dlopen` JPEG XL，CMake 用 `objdump` 读
-  SONAME，已加 `binutils`；运行期能否找到库待实机验证。
-- 下一步可以开 `cutefish-framework`（同样依赖 toolkit）。
+  SONAME，已加 `binutils`；运行期能否找到库待实机验证（可能要 wrap
+  `LD_LIBRARY_PATH`）。
+- toolkit 与 compositor 靠私有 Wayland 协议协作，升级必须同日一起做，
+  见 [survey.md](survey.md) 第一节。
